@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="description" content="A text-only Spotify controller. No album art, no images, ever.">
+<meta name="theme-color" content="#0d0d0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CleanPlay">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<title>CleanPlay — text only</title>
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%230d0d0e' rx='12'/><text x='32' y='44' font-family='Georgia,serif' font-size='38' font-style='italic' fill='%23d4a449' text-anchor='middle'>C</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%230d0d0e' rx='38'/><text x='90' y='124' font-family='Georgia,serif' font-size='108' font-style='italic' fill='%23d4a449' text-anchor='middle'>C</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=JetBrains+Mono:wght@300;400;500;600&family=Inter+Tight:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0d0e;--bg-warm:#131312;--surface:#18181b;--surface-2:#1f1f23;--border:#2a2a30;--border-soft:#1f1f25;--text:#f4f4ec;--text-soft:#c4c4bc;--muted:#6f6f76;--muted-dim:#4a4a50;--accent:#d4a449;--accent-bright:#e8b659;--accent-dim:#8a6a2c;--accent-soft:rgba(212,164,73,0.12);--danger:#d96666;--success:#6fb88c;--serif:'Fraunces','Georgia',serif;--sans:'Inter Tight',system-ui,sans-serif;--mono:'JetBrains Mono','SF Mono',monospace;--max-width:1280px;--sidebar-width:240px;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+body{background:radial-gradient(ellipse at top,rgba(212,164,73,0.04),transparent 50%),radial-gradient(ellipse at bottom right,rgba(212,164,73,0.02),transparent 50%),var(--bg);background-attachment:fixed;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
+button{font-family:inherit;cursor:pointer}
+input,textarea{font-family:inherit}
+::selection{background:var(--accent-soft);color:var(--accent-bright)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted-dim)}
+.gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center}
+.gate-logo{font-family:var(--serif);font-style:italic;font-size:64px;color:var(--accent);font-weight:500;margin-bottom:4px;letter-spacing:-2px}
+.gate-tag{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:4px;margin-bottom:56px}
+.gate-lock{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:3px;margin-bottom:16px}
+.gate input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:16px 20px;font-family:var(--mono);font-size:14px;border-radius:8px;width:280px;max-width:100%;outline:none;text-align:center;letter-spacing:4px;transition:border-color 0.2s}
+.gate input:focus{border-color:var(--accent)}
+.gate-error{color:var(--danger);font-family:var(--mono);font-size:12px;margin-top:16px;height:18px;letter-spacing:1px}
+.setup-wrap{max-width:640px;margin:0 auto;padding:48px 24px 80px}
+.setup-header{text-align:center;margin-bottom:56px;padding-bottom:40px;border-bottom:1px solid var(--border-soft)}
+.setup-brand{font-family:var(--serif);font-style:italic;font-size:56px;color:var(--accent);letter-spacing:-2px;font-weight:500;line-height:1;margin-bottom:12px}
+.setup-tagline{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:4px}
+.setup-step{margin-bottom:40px;position:relative;padding-left:24px}
+.setup-step::before{content:'';position:absolute;left:0;top:6px;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(212,164,73,0.15)}
+.step-num{font-family:var(--mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:3px;margin-bottom:10px;font-weight:500}
+.setup-step h2{font-family:var(--serif);font-size:24px;font-weight:500;margin-bottom:12px;color:var(--text);letter-spacing:-0.5px}
+.setup-step p{color:var(--text-soft);margin-bottom:12px;font-size:14px;line-height:1.65}
+.setup-step ol{padding-left:22px;margin-bottom:16px}
+.setup-step ol li{color:var(--text-soft);margin-bottom:8px;font-size:14px;line-height:1.6}
+.setup-step a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-dim);transition:color 0.2s}
+.setup-step a:hover{color:var(--accent-bright)}
+.code-block{background:var(--bg-warm);border:1px solid var(--border);padding:12px 16px;border-radius:6px;font-family:var(--mono);font-size:12px;color:var(--accent);margin:8px 0;word-break:break-all;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.copy-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:4px 10px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;border-radius:4px;flex-shrink:0;transition:all 0.2s}
+.copy-btn:hover{color:var(--accent);border-color:var(--accent-dim)}
+.copy-btn.copied{color:var(--success);border-color:var(--success)}
+.field{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.field-label{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:2px}
+.field input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:14px 16px;font-family:var(--mono);font-size:13px;border-radius:6px;outline:none;transition:border-color 0.2s}
+.field input:focus{border-color:var(--accent)}
+.field input::placeholder{color:var(--muted-dim)}
+.note{background:var(--surface);border-left:3px solid var(--accent-dim);padding:12px 16px;font-size:12px;color:var(--text-soft);line-height:1.6;border-radius:0 4px 4px 0;font-family:var(--mono);margin-top:12px}
+.note strong{color:var(--accent)}
+.btn-primary{background:var(--accent);color:#1a1408;border:none;padding:16px 28px;font-family:var(--mono);font-size:12px;font-weight:600;border-radius:8px;letter-spacing:2px;text-transform:uppercase;width:100%;margin-top:32px;transition:all 0.2s}
+.btn-primary:hover{background:var(--accent-bright)}
+.btn-primary:active{transform:scale(0.98)}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);padding:10px 16px;font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;border-radius:6px;transition:all 0.2s}
+.btn-ghost:hover{color:var(--accent);border-color:var(--accent-dim)}
+#auth-status{font-family:var(--mono);font-size:12px;margin-top:16px;text-align:center;min-height:20px}
+#auth-status.error{color:var(--danger)}
+#auth-status.success{color:var(--success)}
+.app{display:none;min-height:100vh;flex-direction:column}
+.app.active{display:flex}
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border-soft);position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);background:rgba(13,13,14,0.85)}
+.header-brand{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--accent);font-weight:500;letter-spacing:-0.5px}
+.header-status{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--muted-dim);transition:all 0.3s}
+.status-dot.live{background:var(--success);box-shadow:0 0 0 3px rgba(111,184,140,0.2);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+.main{flex:1;display:flex;flex-direction:column;max-width:var(--max-width);margin:0 auto;width:100%}
+.view{display:none;flex:1;flex-direction:column;padding-bottom:100px;animation:fadeIn 0.3s ease-out}
+.view.active{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.np-container{padding:32px 24px 24px;border-bottom:1px solid var(--border-soft)}
+.np-label{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:3px;margin-bottom:24px;display:flex;align-items:center;gap:8px}
+.np-label::after{content:'';flex:1;height:1px;background:linear-gradient(to right,var(--border),transparent)}
+.np-track{font-family:var(--serif);font-size:clamp(28px,6vw,44px);font-weight:500;line-height:1.1;letter-spacing:-1px;margin-bottom:14px;color:var(--text);word-break:break-word}
+.np-track.italic{font-style:italic}
+.np-artist{font-family:var(--sans);font-size:clamp(15px,3vw,18px);color:var(--accent);margin-bottom:6px;font-weight:400;word-break:break-word}
+.np-album{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-word}
+.np-explicit{display:inline-block;background:var(--surface-2);color:var(--muted);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:1px;margin-left:8px;vertical-align:middle}
+.np-idle{text-align:center;padding:64px 24px;color:var(--muted)}
+.np-idle-icon{font-family:var(--serif);font-style:italic;font-size:48px;color:var(--muted-dim);margin-bottom:16px}
+.np-idle p{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;line-height:1.8}
+.progress-area{padding:16px 24px 12px}
+.progress-bar{background:var(--border);height:3px;border-radius:2px;cursor:pointer;position:relative;overflow:hidden}
+.progress-bar:hover{height:4px}
+.progress-fill{background:var(--accent);height:100%;border-radius:2px;transition:width 1s linear;width:0%;position:relative}
+.time-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;letter-spacing:1px}
+.controls{padding:8px 16px 24px;display:flex;align-items:center;justify-content:space-between;max-width:480px;margin:0 auto;width:100%}
+.ctrl{background:none;border:none;color:var(--text-soft);padding:12px;border-radius:50%;transition:all 0.2s;display:flex;align-items:center;justify-content:center;width:48px;height:48px;position:relative}
+.ctrl svg{width:22px;height:22px;fill:currentColor}
+.ctrl:hover{color:var(--accent);background:var(--surface)}
+.ctrl:active{transform:scale(0.92)}
+.ctrl.primary{background:var(--accent);color:#1a1408;width:64px;height:64px}
+.ctrl.primary svg{width:26px;height:26px}
+.ctrl.primary:hover{background:var(--accent-bright);color:#1a1408}
+.ctrl.active{color:var(--accent)}
+.ctrl.active::after{content:'';position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent)}
+.volume-row{padding:8px 24px 24px;display:flex;align-items:center;gap:14px;max-width:480px;margin:0 auto;width:100%}
+.vol-label{font-family:var(--mono);font-size:10px;color:var(--muted);width:30px;letter-spacing:1px}
+.vol-pct{font-family:var(--mono);font-size:10px;color:var(--muted);width:36px;text-align:right;letter-spacing:1px}
+input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;cursor:pointer}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;border:none;transition:transform 0.2s}
+input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;border:none}
+.device-bar{padding:10px 24px;display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;border-top:1px solid var(--border-soft)}
+.device-bar button{background:none;border:none;color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:4px 8px;border-radius:4px;transition:background 0.2s}
+.device-bar button:hover{background:var(--surface)}
+.view-header{padding:24px 24px 16px;border-bottom:1px solid var(--border-soft)}
+.view-title{font-family:var(--serif);font-style:italic;font-size:32px;color:var(--text);font-weight:500;margin-bottom:16px;letter-spacing:-0.5px}
+.search-box{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:border-color 0.2s}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box input{flex:1;background:transparent;border:none;color:var(--text);padding:14px 16px;font-family:var(--sans);font-size:15px;outline:none}
+.search-box input::placeholder{color:var(--muted)}
+.search-box button{background:transparent;border:none;color:var(--accent);padding:0 18px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;border-left:1px solid var(--border)}
+.search-box button:hover{background:var(--accent-soft)}
+.search-filters{display:flex;gap:4px;margin-top:14px;flex-wrap:wrap}
+.filter-pill{background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:999px;font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;transition:all 0.2s}
+.filter-pill:hover{color:var(--text-soft);border-color:var(--muted)}
+.filter-pill.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-dim)}
+.list-section{padding:16px 24px 8px}
+.list-section-title{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:3px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
+.list-section-count{color:var(--muted-dim);font-weight:400}
+.item{display:flex;align-items:center;gap:16px;padding:14px 24px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid var(--border-soft);position:relative}
+.item:hover{background:var(--surface)}
+.item:active{background:var(--surface-2)}
+.item.playing{background:var(--accent-soft)}
+.item.playing::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.item-num{font-family:var(--mono);font-size:11px;color:var(--muted);width:24px;text-align:right;flex-shrink:0}
+.item-content{flex:1;min-width:0}
+.item-title{font-size:15px;font-weight:500;color:var(--text);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item-title.italic{font-family:var(--serif);font-style:italic;font-weight:500}
+.item.playing .item-title{color:var(--accent)}
+.item-subtitle{font-size:13px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item-meta{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.item-duration{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0;letter-spacing:0.5px}
+.empty{text-align:center;padding:60px 24px;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;line-height:1.8}
+.empty-art{font-family:var(--serif);font-style:italic;font-size:56px;color:var(--muted-dim);margin-bottom:16px}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:rgba(13,13,14,0.92);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:8px 0 calc(8px + var(--safe-bottom));z-index:100;justify-content:space-around}
+.tab{flex:1;background:none;border:none;color:var(--muted);padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:color 0.2s;max-width:100px}
+.tab svg{width:22px;height:22px;fill:currentColor}
+.tab-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:1.5px}
+.tab.active{color:var(--accent)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:200;display:none;align-items:flex-end;justify-content:center;animation:overlayIn 0.2s ease}
+.modal-overlay.active{display:flex}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--bg-warm);border:1px solid var(--border);border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;animation:slideUp 0.3s cubic-bezier(0.2,0.9,0.3,1);padding-bottom:var(--safe-bottom)}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg-warm)}
+.modal-title{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--text);font-weight:500}
+.modal-close{background:none;border:none;color:var(--muted);font-size:24px;padding:4px 8px;line-height:1}
+.modal-close:hover{color:var(--accent)}
+.modal-content{padding:16px 0}
+.device-item{display:flex;align-items:center;gap:14px;padding:14px 24px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid var(--border-soft)}
+.device-item:hover{background:var(--surface)}
+.device-item.active{background:var(--accent-soft)}
+.device-icon{font-family:var(--mono);font-size:18px;color:var(--accent);width:28px;text-align:center}
+.device-name{flex:1;font-size:14px;color:var(--text)}
+.device-name span{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-top:2px}
+.device-active{font-family:var(--mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:1px}
+.timer-options{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:16px 24px}
+.timer-btn{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:16px 12px;border-radius:8px;font-family:var(--mono);font-size:12px;letter-spacing:1px;text-transform:uppercase;transition:all 0.2s}
+.timer-btn:hover{border-color:var(--accent);color:var(--accent)}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border-soft);gap:16px}
+.settings-info{flex:1;min-width:0}
+.settings-label{font-size:14px;color:var(--text);margin-bottom:2px}
+.settings-detail{font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-word}
+.toast{position:fixed;top:calc(20px + var(--safe-top));left:50%;transform:translateX(-50%) translateY(-100px);background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:8px;font-family:var(--mono);font-size:12px;letter-spacing:1px;z-index:300;transition:transform 0.3s cubic-bezier(0.2,0.9,0.3,1);max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{border-color:var(--success);color:var(--success)}
+.toast.error{border-color:var(--danger);color:var(--danger)}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (min-width:1024px){
+  .header{padding:16px 32px}
+  .main{flex-direction:row;padding:0}
+  .tabs{position:static;flex-direction:column;width:var(--sidebar-width);background:var(--bg-warm);border-top:none;border-right:1px solid var(--border);padding:24px 12px;justify-content:flex-start;gap:4px;flex-shrink:0;align-self:stretch}
+  .tab{flex:none;flex-direction:row;justify-content:flex-start;gap:14px;padding:12px 16px;border-radius:8px;max-width:none;width:100%;text-align:left}
+  .tab:hover{background:var(--surface)}
+  .tab.active{background:var(--accent-soft)}
+  .tab-label{font-size:12px}
+  .view-shell{flex:1;display:flex;flex-direction:column;min-width:0}
+  .view{padding-bottom:24px;flex:1}
+  .np-container{padding:56px 48px 32px}
+  .progress-area{padding:16px 48px 12px}
+  .controls{padding:16px}
+  .volume-row{padding:16px 48px 32px}
+  .device-bar{padding:16px 48px}
+  .view-header{padding:32px 48px 20px}
+  .item{padding:16px 48px}
+  .list-section{padding:24px 48px 8px}
+  .empty{padding:80px 24px}
+}
+@media (display-mode:standalone){.header{padding-top:calc(14px + var(--safe-top))}}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="gate-logo">CleanPlay</div>
+  <div class="gate-tag">private · text only</div>
+  <div class="gate-lock" id="gate-prompt">enter access code</div>
+  <input type="password" id="gate-input" autocomplete="off" maxlength="32" onkeydown="if(event.key==='Enter')checkGate()" placeholder="• • • • • •">
+  <div class="gate-error" id="gate-error"></div>
+</div>
+
+<div class="setup-wrap" id="setup" style="display:none">
+  <div class="setup-header">
+    <div class="setup-brand">CleanPlay</div>
+    <div class="setup-tagline">spotify · text only · forever</div>
+  </div>
+  <div class="setup-step">
+    <div class="step-num">Step 01</div>
+    <h2>Create a Spotify Developer App</h2>
+    <p>Spotify needs a free Developer App to give you secure access. It takes about 3 minutes.</p>
+    <ol>
+      <li>Open <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a></li>
+      <li>Log in with your Spotify account, click <strong>Create App</strong></li>
+      <li>Set <strong>App name</strong> and <strong>App description</strong> (e.g. "CleanPlay")</li>
+      <li>For <strong>Redirect URI</strong>, paste exactly:</li>
+    </ol>
+    <div class="code-block">
+      <span id="redirect-uri-display"></span>
+      <button class="copy-btn" id="copy-uri-btn" onclick="copyText('redirect-uri-display','copy-uri-btn')">Copy</button>
+    </div>
+    <ol start="5">
+      <li>Tick <strong>Web API</strong> under "Which API/SDKs are you planning to use?"</li>
+      <li>Accept terms → <strong>Save</strong></li>
+      <li>Open the app → <strong>Settings</strong> → copy the <strong>Client ID</strong></li>
+    </ol>
+    <div class="note"><strong>Important:</strong> Keep the app in Development Mode. Only Spotify accounts you explicitly add (Settings → User Management) can log in. This is your first security layer.</div>
+  </div>
+  <div class="setup-step">
+    <div class="step-num">Step 02</div>
+    <h2>Enter your Client ID</h2>
+    <p>Paste the Client ID from your Spotify app dashboard.</p>
+    <div class="field">
+      <span class="field-label">Spotify Client ID</span>
+      <input type="text" id="client-id-input" placeholder="e.g. a1b2c3d4e5f6..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+  </div>
+  <div class="setup-step">
+    <div class="step-num">Step 03 — recommended</div>
+    <h2>Lock to your Spotify account</h2>
+    <p>The strongest security layer. After login, the app verifies the Spotify user matches yours exactly. Even if someone got past the password and your dev app, they couldn't use it with a different account.</p>
+    <p>Find your username at <a href="https://www.spotify.com/account/overview/" target="_blank" rel="noopener">spotify.com/account</a> — look for "Username".</p>
+    <div class="field">
+      <span class="field-label">Your Spotify Username (recommended)</span>
+      <input type="text" id="user-id-input" placeholder="e.g. marnusvandernest" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+  </div>
+  <button class="btn-primary" onclick="startAuth()">Connect to Spotify →</button>
+  <div id="auth-status"></div>
+</div>
+
+<div class="app" id="app">
+  <header class="header">
+    <div class="header-brand">CleanPlay</div>
+    <div class="header-status">
+      <span id="user-display"></span>
+      <span class="status-dot" id="status-dot"></span>
+    </div>
+  </header>
+  <div class="main">
+    <nav class="tabs">
+      <button class="tab active" data-view="now-playing" onclick="switchView('now-playing')">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span class="tab-label">Now Playing</span>
+      </button>
+      <button class="tab" data-view="search" onclick="switchView('search')">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 13 16h.5l.27.28v.79l5 4.99L20.49 21l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg><span class="tab-label">Search</span>
+      </button>
+      <button class="tab" data-view="library" onclick="switchView('library')">
+        <svg viewBox="0 0 24 24"><path d="M4 6h2v14H4zm14 0h2v14h-2zM8 6h8v14H8z"/></svg><span class="tab-label">Library</span>
+      </button>
+      <button class="tab" data-view="queue" onclick="switchView('queue')">
+        <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg><span class="tab-label">Queue</span>
+      </button>
+      <button class="tab" data-view="settings" onclick="switchView('settings')">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg><span class="tab-label">Settings</span>
+      </button>
+    </nav>
+    <div class="view-shell" style="flex:1;display:flex;flex-direction:column;min-width:0">
+      <section class="view active" id="view-now-playing">
+        <div class="np-container">
+          <div class="np-label">Now Playing</div>
+          <div id="np-loading" style="text-align:center;padding:40px 0;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase"><span class="spinner"></span>Connecting…</div>
+          <div id="np-idle" class="np-idle" style="display:none">
+            <div class="np-idle-icon">·</div>
+            <p>nothing playing<br>open spotify · start any track<br>controls will appear here</p>
+          </div>
+          <div id="np-info" style="display:none">
+            <div class="np-track" id="np-track">—</div>
+            <div class="np-artist" id="np-artist">—</div>
+            <div class="np-album" id="np-album">—</div>
+          </div>
+        </div>
+        <div class="progress-area">
+          <div class="progress-bar" id="progress-bar" onclick="seekTo(event)"><div class="progress-fill" id="progress-fill"></div></div>
+          <div class="time-row"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
+        </div>
+        <div class="controls">
+          <button class="ctrl" id="btn-shuffle" onclick="toggleShuffle()" title="Shuffle"><svg viewBox="0 0 24 24"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
+          <button class="ctrl" onclick="prevTrack()" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+          <button class="ctrl primary" id="btn-play" onclick="togglePlay()" title="Play/Pause"><svg viewBox="0 0 24 24" id="play-icon"><path d="M8 5v14l11-7z"/></svg></button>
+          <button class="ctrl" onclick="nextTrack()" title="Next"><svg viewBox="0 0 24 24"><path d="M6 18 14.5 12 6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+          <button class="ctrl" id="btn-repeat" onclick="toggleRepeat()" title="Repeat"><svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+        </div>
+        <div class="volume-row">
+          <span class="vol-label">VOL</span>
+          <input type="range" id="volume-slider" min="0" max="100" value="80" oninput="setVolume(this.value)">
+          <span class="vol-pct" id="vol-pct">80</span>
+        </div>
+        <div class="device-bar">
+          <span id="device-info">— no device —</span>
+          <button onclick="openModal('devices')">Switch device →</button>
+        </div>
+      </section>
+      <section class="view" id="view-search">
+        <div class="view-header">
+          <h1 class="view-title">Search</h1>
+          <div class="search-box">
+            <input type="text" id="search-input" placeholder="Tracks, artists, albums, playlists…" onkeydown="if(event.key==='Enter')doSearch()">
+            <button onclick="doSearch()">Go</button>
+          </div>
+          <div class="search-filters">
+            <button class="filter-pill active" data-filter="track" onclick="setSearchFilter('track')">Tracks</button>
+            <button class="filter-pill" data-filter="artist" onclick="setSearchFilter('artist')">Artists</button>
+            <button class="filter-pill" data-filter="album" onclick="setSearchFilter('album')">Albums</button>
+            <button class="filter-pill" data-filter="playlist" onclick="setSearchFilter('playlist')">Playlists</button>
+          </div>
+        </div>
+        <div id="search-results"><div class="empty"><div class="empty-art">~</div>search anything · zero images returned</div></div>
+      </section>
+      <section class="view" id="view-library">
+        <div class="view-header"><h1 class="view-title">Library</h1></div>
+        <div id="library-list"><div class="empty"><div class="empty-art">⋯</div>loading…</div></div>
+      </section>
+      <section class="view" id="view-queue">
+        <div class="view-header"><h1 class="view-title">Queue</h1></div>
+        <div id="queue-list"><div class="empty"><div class="empty-art">·</div>queue is empty</div></div>
+      </section>
+      <section class="view" id="view-settings">
+        <div class="view-header"><h1 class="view-title">Settings</h1></div>
+        <div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">Sleep Timer</div><div class="settings-detail" id="sleep-status">Off</div></div>
+            <button class="btn-ghost" onclick="openModal('sleep-timer')">Configure</button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">Active device</div><div class="settings-detail" id="settings-device">—</div></div>
+            <button class="btn-ghost" onclick="openModal('devices')">Change</button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">Spotify account</div><div class="settings-detail" id="settings-account">—</div></div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">Sign out</div><div class="settings-detail">Clears tokens, returns to setup</div></div>
+            <button class="btn-ghost" onclick="signOut()">Sign out</button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">Reset access code</div><div class="settings-detail">Forget the local password gate</div></div>
+            <button class="btn-ghost" onclick="resetGate()">Reset</button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay · v2 · text only · no images, ever</div></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-devices" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Devices</div><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-content" id="device-list-content"><div class="empty"><span class="spinner"></span>loading devices…</div></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-sleep-timer" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Sleep Timer</div><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-content">
+      <div class="timer-options">
+        <button class="timer-btn" onclick="setSleepTimer(0)">Off</button>
+        <button class="timer-btn" onclick="setSleepTimer(15)">15 min</button>
+        <button class="timer-btn" onclick="setSleepTimer(30)">30 min</button>
+        <button class="timer-btn" onclick="setSleepTimer(45)">45 min</button>
+        <button class="timer-btn" onclick="setSleepTimer(60)">1 hour</button>
+        <button class="timer-btn" onclick="setSleepTimer(90)">1.5 hour</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','user-read-email','user-read-private','streaming'].join(' ');
+const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier'};
+let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null};
+
+async function sha256Hex(text){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+
+async function checkGate(){
+  const input = document.getElementById('gate-input').value;
+  if(!input)return;
+  const stored = localStorage.getItem(KEYS.gateHash);
+  if(!stored){
+    if(input.length<4){showGateError('Min. 4 characters');return;}
+    localStorage.setItem(KEYS.gateHash, await sha256Hex(input));
+    sessionStorage.setItem(KEYS.gateOk,'1');
+    proceedFromGate();return;
+  }
+  const h = await sha256Hex(input);
+  if(h===stored){sessionStorage.setItem(KEYS.gateOk,'1');proceedFromGate();}
+  else{showGateError('Wrong code');document.getElementById('gate-input').value='';}
+}
+function showGateError(msg){const el=document.getElementById('gate-error');el.textContent=msg;setTimeout(()=>{el.textContent='';},2500);}
+function proceedFromGate(){document.getElementById('gate').style.display='none';decideNextScreen();}
+function maybeShowGate(){
+  const stored = localStorage.getItem(KEYS.gateHash);
+  const unlocked = sessionStorage.getItem(KEYS.gateOk);
+  if(!stored){document.getElementById('gate-prompt').textContent='set your access code';document.getElementById('gate-input').placeholder='min 4 chars';return true;}
+  if(unlocked){document.getElementById('gate').style.display='none';return false;}
+  return true;
+}
+function resetGate(){if(!confirm("Reset your access code? You'll set a new one next time."))return;localStorage.removeItem(KEYS.gateHash);sessionStorage.removeItem(KEYS.gateOk);toast('Access code reset','success');}
+
+function genRandomString(len){const arr=new Uint8Array(len);crypto.getRandomValues(arr);return Array.from(arr).map(b=>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[b%62]).join('');}
+async function pkceChallenge(verifier){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');}
+
+async function startAuth(){
+  const clientId = document.getElementById('client-id-input').value.trim();
+  const userId = document.getElementById('user-id-input').value.trim().toLowerCase();
+  if(!clientId){setAuthStatus('Paste your Client ID first.','error');return;}
+  localStorage.setItem(KEYS.clientId, clientId);
+  if(userId)localStorage.setItem(KEYS.expectedUserId, userId);
+  else localStorage.removeItem(KEYS.expectedUserId);
+  setAuthStatus('Redirecting to Spotify…');
+  const verifier = genRandomString(64);
+  const challenge = await pkceChallenge(verifier);
+  localStorage.setItem(KEYS.codeVerifier, verifier);
+  const params = new URLSearchParams({response_type:'code',client_id:clientId,scope:SCOPES,redirect_uri:REDIRECT_URI,code_challenge_method:'S256',code_challenge:challenge});
+  window.location='https://accounts.spotify.com/authorize?'+params.toString();
+}
+
+async function handleAuthCallback(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const err = params.get('error');
+  if(err){document.getElementById('gate').style.display='none';document.getElementById('setup').style.display='block';setAuthStatus('Spotify error: '+err,'error');window.history.replaceState(null,null,REDIRECT_URI);return false;}
+  if(!code)return false;
+  const verifier = localStorage.getItem(KEYS.codeVerifier);
+  const clientId = localStorage.getItem(KEYS.clientId);
+  if(!verifier||!clientId){document.getElementById('gate').style.display='none';document.getElementById('setup').style.display='block';setAuthStatus('Setup incomplete. Try again.','error');return false;}
+  setAuthStatus('Exchanging code for token…');
+  state.clientId = clientId;
+  try{
+    const r = await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:REDIRECT_URI,client_id:clientId,code_verifier:verifier})});
+    if(!r.ok)throw new Error(await r.text());
+    saveTokens(await r.json());
+    localStorage.removeItem(KEYS.codeVerifier);
+    window.history.replaceState(null,null,REDIRECT_URI);
+    if(!await verifyUser())return false;
+    showApp();
+    return true;
+  }catch(e){
+    document.getElementById('gate').style.display='none';
+    document.getElementById('setup').style.display='block';
+    setAuthStatus('Token exchange failed: '+e.message,'error');
+    return false;
+  }
+}
+
+function saveTokens(data){
+  state.accessToken=data.access_token;
+  if(data.refresh_token)state.refreshToken=data.refresh_token;
+  state.tokenExpires=Date.now()+(data.expires_in*1000)-60000;
+  localStorage.setItem(KEYS.accessToken,state.accessToken);
+  if(state.refreshToken)localStorage.setItem(KEYS.refreshToken,state.refreshToken);
+  localStorage.setItem(KEYS.tokenExpires,String(state.tokenExpires));
+}
+
+async function refreshTokenFn(){
+  if(!state.refreshToken||!state.clientId)return false;
+  try{
+    const r = await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:state.refreshToken,client_id:state.clientId})});
+    if(!r.ok)return false;
+    saveTokens(await r.json());
+    return true;
+  }catch{return false;}
+}
+
+async function ensureToken(){if(Date.now()>=state.tokenExpires){const ok=await refreshTokenFn();if(!ok){signOut();return false;}}return true;}
+
+async function verifyUser(){
+  const me = await api('/me');
+  if(!me){setAuthStatus('Failed to verify identity','error');return false;}
+  state.user = me;
+  const expected = localStorage.getItem(KEYS.expectedUserId);
+  if(expected && me.id.toLowerCase() !== expected){
+    localStorage.removeItem(KEYS.accessToken);
+    localStorage.removeItem(KEYS.refreshToken);
+    state.accessToken=null;state.refreshToken=null;
+    document.getElementById('gate').style.display='none';
+    document.getElementById('setup').style.display='block';
+    setAuthStatus('Locked to "'+expected+'". You logged in as "'+me.id+'".','error');
+    return false;
+  }
+  return true;
+}
+
+function setAuthStatus(msg,kind){const el=document.getElementById('auth-status');el.textContent=msg;el.className=kind||'';}
+
+async function api(path,method='GET',body=null){
+  if(path!=='/me' && !await ensureToken())return null;
+  const opts = {method,headers:{'Authorization':'Bearer '+state.accessToken}};
+  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  try{
+    const r = await fetch('https://api.spotify.com/v1'+path,opts);
+    if(r.status===401){const ok=await refreshTokenFn();if(ok)return api(path,method,body);signOut();return null;}
+    if(r.status===429){toast('Rate-limited · slow down','error');return null;}
+    if(r.status===403){toast('Premium required for this action','error');return null;}
+    if(r.status===204)return {};
+    if(!r.ok)return null;
+    const text = await r.text();
+    if(!text)return {};
+    try{return JSON.parse(text);}catch{return {};}
+  }catch{return null;}
+}
+
+async function fetchState(){
+  const data = await api('/me/player');
+  if(!data || !data.item){showIdle();return;}
+  state.isPlaying=data.is_playing;state.shuffleState=data.shuffle_state;state.repeatState=data.repeat_state;
+  state.localProgress=data.progress_ms||0;state.localDuration=data.item.duration_ms||0;
+  updateNowPlaying(data);updateControls();
+}
+
+function updateNowPlaying(data){
+  const track = data.item;
+  document.getElementById('np-loading').style.display='none';
+  document.getElementById('np-idle').style.display='none';
+  document.getElementById('np-info').style.display='block';
+  const trackEl = document.getElementById('np-track');
+  trackEl.textContent = track.name;
+  trackEl.className = 'np-track' + (track.name.length<30?' italic':'');
+  document.getElementById('np-artist').textContent = track.artists.map(a=>a.name).join(' · ');
+  const albumYear = track.album?.release_date ? new Date(track.album.release_date).getFullYear() : '';
+  let albumLine = escapeHtml(track.album?.name||'');
+  if(albumYear)albumLine += ' · '+albumYear;
+  if(track.explicit)albumLine += '<span class="np-explicit">E</span>';
+  document.getElementById('np-album').innerHTML = albumLine;
+  if(data.device){
+    document.getElementById('device-info').textContent = '▸ '+data.device.name+' · '+(data.device.type||'device');
+    document.getElementById('volume-slider').value = data.device.volume_percent ?? 80;
+    document.getElementById('vol-pct').textContent = data.device.volume_percent ?? '—';
+    document.getElementById('settings-device').textContent = data.device.name+' ('+(data.device.type||'device')+')';
+  }
+  document.getElementById('status-dot').classList.add('live');
+  updateProgress();
+}
+
+function showIdle(){
+  document.getElementById('np-loading').style.display='none';
+  document.getElementById('np-idle').style.display='block';
+  document.getElementById('np-info').style.display='none';
+  document.getElementById('status-dot').classList.remove('live');
+  document.getElementById('device-info').textContent='— no device active —';
+}
+
+function updateControls(){
+  document.getElementById('play-icon').innerHTML = state.isPlaying ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+  document.getElementById('btn-shuffle').classList.toggle('active', state.shuffleState);
+  document.getElementById('btn-repeat').classList.toggle('active', state.repeatState!=='off');
+}
+
+function updateProgress(){
+  if(!state.localDuration){
+    document.getElementById('progress-fill').style.width='0%';
+    document.getElementById('time-current').textContent='0:00';
+    document.getElementById('time-total').textContent='0:00';return;
+  }
+  const pct = Math.min((state.localProgress/state.localDuration)*100, 100);
+  document.getElementById('progress-fill').style.width = pct+'%';
+  document.getElementById('time-current').textContent = formatTime(state.localProgress);
+  document.getElementById('time-total').textContent = formatTime(state.localDuration);
+}
+
+function formatTime(ms){if(!ms||ms<0)return '0:00';const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+
+function startProgressTick(){
+  clearInterval(state.progressTimer);
+  state.progressTimer = setInterval(()=>{
+    if(state.isPlaying && state.localDuration){
+      state.localProgress += 1000;
+      if(state.localProgress > state.localDuration)state.localProgress = state.localDuration;
+      updateProgress();
+      if(state.sleepTimerEnd && Date.now() >= state.sleepTimerEnd){
+        api('/me/player/pause','PUT');
+        state.sleepTimerEnd=0;
+        document.getElementById('sleep-status').textContent='Off (timer expired)';
+        toast('Sleep timer · paused','success');
+      }
+    }
+  }, 1000);
+}
+
+async function togglePlay(){
+  if(state.isPlaying){await api('/me/player/pause','PUT');state.isPlaying=false;}
+  else{await api('/me/player/play','PUT');state.isPlaying=true;}
+  updateControls();
+}
+async function nextTrack(){await api('/me/player/next','POST');setTimeout(fetchState,600);}
+async function prevTrack(){await api('/me/player/previous','POST');setTimeout(fetchState,600);}
+async function toggleShuffle(){state.shuffleState=!state.shuffleState;await api('/me/player/shuffle?state='+state.shuffleState,'PUT');updateControls();}
+async function toggleRepeat(){const modes=['off','context','track'];state.repeatState=modes[(modes.indexOf(state.repeatState)+1)%modes.length];await api('/me/player/repeat?state='+state.repeatState,'PUT');updateControls();toast('Repeat: '+state.repeatState);}
+async function setVolume(val){document.getElementById('vol-pct').textContent=val;await api('/me/player/volume?volume_percent='+val,'PUT');}
+async function seekTo(e){if(!state.localDuration)return;const rect=e.currentTarget.getBoundingClientRect();const pct=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));const ms=Math.floor(pct*state.localDuration);state.localProgress=ms;updateProgress();await api('/me/player/seek?position_ms='+ms,'PUT');}
+
+function setSearchFilter(filter){state.searchFilter=filter;document.querySelectorAll('.filter-pill').forEach(p=>p.classList.toggle('active',p.dataset.filter===filter));if(document.getElementById('search-input').value.trim())doSearch();}
+
+async function doSearch(){
+  const q = document.getElementById('search-input').value.trim();
+  if(!q)return;
+  const results = document.getElementById('search-results');
+  results.innerHTML = '<div class="empty"><span class="spinner"></span>searching…</div>';
+  const data = await api('/search?q='+encodeURIComponent(q)+'&type='+state.searchFilter+'&limit=30');
+  if(!data){results.innerHTML='<div class="empty">search failed</div>';return;}
+  let items=[],renderer=null;
+  if(state.searchFilter==='track'){items=data.tracks?.items||[];renderer=renderTrackItem;}
+  else if(state.searchFilter==='artist'){items=data.artists?.items||[];renderer=renderArtistItem;}
+  else if(state.searchFilter==='album'){items=data.albums?.items||[];renderer=renderAlbumItem;}
+  else if(state.searchFilter==='playlist'){items=(data.playlists?.items||[]).filter(Boolean);renderer=renderPlaylistItem;}
+  if(!items.length){results.innerHTML='<div class="empty"><div class="empty-art">·</div>no results</div>';return;}
+  results.innerHTML = items.map((item,i)=>renderer(item,i)).join('');
+}
+
+function renderTrackItem(t,i){return `<div class="item" onclick="playUri('${t.uri}',null)"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}</div><div class="item-subtitle">${escapeHtml(t.artists.map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div><div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;}
+function renderArtistItem(a,i){return `<div class="item" onclick="playArtist('${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${(a.genres||[]).slice(0,3).join(' · ')||'Artist'}</div><div class="item-meta">${a.followers?.total?a.followers.total.toLocaleString()+' followers':''}</div></div></div>`;}
+function renderAlbumItem(a,i){return `<div class="item" onclick="playUri(null,'${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${escapeHtml(a.artists.map(ar=>ar.name).join(', '))}</div><div class="item-meta">${a.album_type} · ${a.total_tracks} tracks · ${a.release_date?.slice(0,4)||''}</div></div></div>`;}
+function renderPlaylistItem(p,i){return `<div class="item" onclick="playUri(null,'${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${p.tracks?.total||0} tracks</div></div></div>`;}
+
+async function playUri(trackUri,contextUri){const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};await api('/me/player/play','PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
+async function playArtist(artistUri){await api('/me/player/play','PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
+
+async function loadLibrary(){
+  const list = document.getElementById('library-list');
+  list.innerHTML = '<div class="empty"><span class="spinner"></span>loading library…</div>';
+  const [recent,saved,playlists] = await Promise.all([api('/me/player/recently-played?limit=10'),api('/me/tracks?limit=15'),api('/me/playlists?limit=20')]);
+  let html = '';
+  if(recent?.items?.length){
+    html += `<div class="list-section"><div class="list-section-title">Recently played <span class="list-section-count">${recent.items.length}</span></div></div>`;
+    html += recent.items.map((it,i)=>renderTrackItem(it.track,i)).join('');
+  }
+  if(saved?.items?.length){
+    html += `<div class="list-section"><div class="list-section-title">Liked songs <span class="list-section-count">${saved.total||saved.items.length}</span></div></div>`;
+    html += saved.items.map((it,i)=>renderTrackItem(it.track,i)).join('');
+  }
+  if(playlists?.items?.length){
+    html += `<div class="list-section"><div class="list-section-title">Your playlists <span class="list-section-count">${playlists.total||playlists.items.length}</span></div></div>`;
+    html += playlists.items.filter(Boolean).map((p,i)=>renderPlaylistItem(p,i)).join('');
+  }
+  list.innerHTML = html || '<div class="empty">library is empty</div>';
+}
+
+async function loadQueue(){
+  const list = document.getElementById('queue-list');
+  list.innerHTML = '<div class="empty"><span class="spinner"></span>loading queue…</div>';
+  const data = await api('/me/player/queue');
+  if(!data || !data.queue){list.innerHTML='<div class="empty"><div class="empty-art">·</div>no queue available</div>';return;}
+  let html = '';
+  if(data.currently_playing){
+    html += `<div class="list-section"><div class="list-section-title">Now playing</div></div>`;
+    html += `<div class="item playing"><div class="item-num">▸</div><div class="item-content"><div class="item-title">${escapeHtml(data.currently_playing.name)}</div><div class="item-subtitle">${escapeHtml(data.currently_playing.artists.map(a=>a.name).join(', '))}</div></div><div class="item-duration">${formatTime(data.currently_playing.duration_ms)}</div></div>`;
+  }
+  if(data.queue.length){
+    html += `<div class="list-section"><div class="list-section-title">Up next <span class="list-section-count">${data.queue.length}</span></div></div>`;
+    html += data.queue.slice(0,25).map(renderTrackItem).join('');
+  } else {
+    html += '<div class="empty"><div class="empty-art">·</div>queue is empty</div>';
+  }
+  list.innerHTML = html;
+}
+
+async function loadDevices(){
+  const content = document.getElementById('device-list-content');
+  content.innerHTML = '<div class="empty"><span class="spinner"></span>loading…</div>';
+  const data = await api('/me/player/devices');
+  if(!data?.devices?.length){content.innerHTML='<div class="empty"><div class="empty-art">·</div>no devices online<br>open spotify on something first</div>';return;}
+  content.innerHTML = data.devices.map(d=>{
+    const icon = d.type==='Computer'?'▢':d.type==='Smartphone'?'▤':d.type==='Speaker'?'◎':'◆';
+    return `<div class="device-item ${d.is_active?'active':''}" onclick="transferTo('${d.id}')"><div class="device-icon">${icon}</div><div class="device-name">${escapeHtml(d.name)}<span>${d.type} · vol ${d.volume_percent ?? '—'}%</span></div>${d.is_active?'<div class="device-active">● active</div>':''}</div>`;
+  }).join('');
+}
+
+async function transferTo(deviceId){await api('/me/player','PUT',{device_ids:[deviceId],play:state.isPlaying});closeModal();setTimeout(fetchState,800);toast('Switched device','success');}
+
+function setSleepTimer(minutes){
+  if(state.sleepTimerInterval)clearInterval(state.sleepTimerInterval);
+  if(minutes===0){state.sleepTimerEnd=0;document.getElementById('sleep-status').textContent='Off';closeModal();toast('Sleep timer off');return;}
+  state.sleepTimerEnd = Date.now()+minutes*60000;
+  document.getElementById('sleep-status').textContent = minutes+' min';
+  state.sleepTimerInterval = setInterval(()=>{
+    const remaining = state.sleepTimerEnd - Date.now();
+    if(remaining<=0){clearInterval(state.sleepTimerInterval);return;}
+    const mins = Math.ceil(remaining/60000);
+    document.getElementById('sleep-status').textContent = mins+' min remaining';
+  },30000);
+  closeModal();
+  toast('Sleep timer · '+minutes+' minutes','success');
+}
+
+function switchView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('view-'+name)?.classList.add('active');
+  document.querySelector('.tab[data-view="'+name+'"]')?.classList.add('active');
+  if(name==='library')loadLibrary();
+  if(name==='queue')loadQueue();
+}
+
+function openModal(name){document.getElementById('modal-'+name)?.classList.add('active');if(name==='devices')loadDevices();}
+function closeModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));}
+
+document.addEventListener('keydown',(e)=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if(!document.getElementById('app').classList.contains('active'))return;
+  switch(e.key){
+    case ' ':e.preventDefault();togglePlay();break;
+    case 'ArrowRight':if(e.shiftKey)nextTrack();break;
+    case 'ArrowLeft':if(e.shiftKey)prevTrack();break;
+    case 's':toggleShuffle();break;
+    case 'r':toggleRepeat();break;
+    case '/':e.preventDefault();switchView('search');document.getElementById('search-input').focus();break;
+    case 'Escape':closeModal();break;
+  }
+});
+
+function escapeHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+function toast(msg,kind){const el=document.getElementById('toast');el.textContent=msg;el.className='toast show '+(kind||'');clearTimeout(toast._t);toast._t=setTimeout(()=>{el.className='toast';},2500);}
+
+function copyText(spanId,btnId){const t=document.getElementById(spanId).textContent;navigator.clipboard?.writeText(t).then(()=>{const btn=document.getElementById(btnId);btn.textContent='Copied';btn.classList.add('copied');setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},2000);});}
+
+function showApp(){
+  document.getElementById('gate').style.display='none';
+  document.getElementById('setup').style.display='none';
+  document.getElementById('app').classList.add('active');
+  document.getElementById('user-display').textContent = state.user?.display_name || state.user?.id || '';
+  document.getElementById('settings-account').textContent = state.user?.email ? state.user.email+' ('+state.user.product+')' : state.user?.id || '';
+  fetchState();
+  startProgressTick();
+  state.pollTimer = setInterval(fetchState, 5000);
+}
+
+function showSetup(){
+  document.getElementById('gate').style.display='none';
+  document.getElementById('setup').style.display='block';
+  document.getElementById('app').classList.remove('active');
+  document.getElementById('redirect-uri-display').textContent = REDIRECT_URI;
+  const savedClientId = localStorage.getItem(KEYS.clientId);
+  const savedUserId = localStorage.getItem(KEYS.expectedUserId);
+  if(savedClientId)document.getElementById('client-id-input').value = savedClientId;
+  if(savedUserId)document.getElementById('user-id-input').value = savedUserId;
+}
+
+function signOut(){
+  clearInterval(state.pollTimer);
+  clearInterval(state.progressTimer);
+  state.accessToken=null;state.refreshToken=null;
+  localStorage.removeItem(KEYS.accessToken);
+  localStorage.removeItem(KEYS.refreshToken);
+  localStorage.removeItem(KEYS.tokenExpires);
+  document.getElementById('app').classList.remove('active');
+  showSetup();
+}
+
+async function decideNextScreen(){
+  if(window.location.search.includes('code=') || window.location.search.includes('error=')){
+    const handled = await handleAuthCallback();
+    if(handled)return;
+  }
+  const savedToken = localStorage.getItem(KEYS.accessToken);
+  const savedRefresh = localStorage.getItem(KEYS.refreshToken);
+  const savedExpires = parseInt(localStorage.getItem(KEYS.tokenExpires)||'0');
+  const savedClientId = localStorage.getItem(KEYS.clientId);
+  state.clientId = savedClientId;
+  state.accessToken = savedToken;
+  state.refreshToken = savedRefresh;
+  state.tokenExpires = savedExpires;
+  if(savedToken && savedClientId){
+    if(Date.now() < savedExpires || savedRefresh){
+      const ok = await verifyUser();
+      if(ok){showApp();return;}
+    }
+  }
+  showSetup();
+}
+
+window.addEventListener('load',()=>{
+  const needsGate = maybeShowGate();
+  if(!needsGate)decideNextScreen();
+});
+</script>
+</body>
+</html>
