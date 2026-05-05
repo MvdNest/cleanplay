@@ -410,7 +410,7 @@ window.onSpotifyWebPlaybackSDKReady = function(){ window._sdkReady = true; if(ty
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','user-read-email','user-read-private','streaming'].join(' ');
 const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier'};
-let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null};
+let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false};
 
 async function sha256Hex(text){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 
@@ -630,6 +630,7 @@ function startProgressTick(){
 }
 
 async function togglePlay(){
+  activateSdkAudio();
   if(state.isPlaying){await api('/me/player/pause','PUT');state.isPlaying=false;}
   else{await api('/me/player/play','PUT');state.isPlaying=true;}
   updateControls();
@@ -664,8 +665,8 @@ function renderArtistItem(a,i){return `<div class="item" onclick="playArtist('${
 function renderAlbumItem(a,i){return `<div class="item" onclick="playUri(null,'${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${escapeHtml(a.artists.map(ar=>ar.name).join(', '))}</div><div class="item-meta">${a.album_type} · ${a.total_tracks} tracks · ${a.release_date?.slice(0,4)||''}</div></div></div>`;}
 function renderPlaylistItem(p,i){return `<div class="item" onclick="playUri(null,'${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${p.tracks?.total||0} tracks</div></div></div>`;}
 
-async function playUri(trackUri,contextUri){const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
-async function playArtist(artistUri){const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
+async function playUri(trackUri,contextUri){activateSdkAudio();const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
+async function playArtist(artistUri){activateSdkAudio();const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
 
 async function loadLibrary(){
   const list = document.getElementById('library-list');
@@ -825,7 +826,20 @@ function createWebPlayer(){
   } catch(e) { console.warn('[SDK] create failed:', e); toast('SDK create error: '+e.message,'error'); }
 }
 
+function activateSdkAudio(){
+  // CRITICAL for iOS: must be called synchronously inside a user gesture
+  if(state.sdkActivated || !state.webPlayer) return;
+  try {
+    if(typeof state.webPlayer.activateElement === 'function'){
+      state.webPlayer.activateElement();
+      state.sdkActivated = true;
+      console.log('[SDK] element activated for iOS audio');
+    }
+  } catch(e){ console.warn('[SDK] activateElement failed:', e); }
+}
+
 async function playHere(){
+  activateSdkAudio();
   if(!state.sdkReady || !state.cleanplayDeviceId){toast('Web player not ready · need Premium','error'); return;}
   state.activeDeviceId = state.cleanplayDeviceId;
   document.getElementById('device-info').textContent = '▸ CleanPlay (this browser) · selected';
