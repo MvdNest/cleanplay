@@ -410,7 +410,7 @@ window.onSpotifyWebPlaybackSDKReady = function(){ window._sdkReady = true; if(ty
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','user-read-email','user-read-private','streaming'].join(' ');
 const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier'};
-let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false};
+let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null};
 
 async function sha256Hex(text){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 
@@ -664,8 +664,8 @@ function renderArtistItem(a,i){return `<div class="item" onclick="playArtist('${
 function renderAlbumItem(a,i){return `<div class="item" onclick="playUri(null,'${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${escapeHtml(a.artists.map(ar=>ar.name).join(', '))}</div><div class="item-meta">${a.album_type} · ${a.total_tracks} tracks · ${a.release_date?.slice(0,4)||''}</div></div></div>`;}
 function renderPlaylistItem(p,i){return `<div class="item" onclick="playUri(null,'${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${p.tracks?.total||0} tracks</div></div></div>`;}
 
-async function playUri(trackUri,contextUri){const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};await api('/me/player/play','PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
-async function playArtist(artistUri){await api('/me/player/play','PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
+async function playUri(trackUri,contextUri){const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
+async function playArtist(artistUri){const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
 
 async function loadLibrary(){
   const list = document.getElementById('library-list');
@@ -717,7 +717,14 @@ async function loadDevices(){
   }).join('');
 }
 
-async function transferTo(deviceId){await api('/me/player','PUT',{device_ids:[deviceId],play:state.isPlaying});closeModal();setTimeout(fetchState,800);toast('Switched device','success');}
+async function transferTo(deviceId){
+  state.activeDeviceId = deviceId;
+  // Try transfer; if it fails it's OK — next play call will use device_id parameter
+  try { await api('/me/player','PUT',{device_ids:[deviceId],play:state.isPlaying}); } catch{}
+  closeModal();
+  setTimeout(fetchState,800);
+  toast('Device selected','success');
+}
 
 function setSleepTimer(minutes){
   if(state.sleepTimerInterval)clearInterval(state.sleepTimerInterval);
@@ -801,6 +808,8 @@ function createWebPlayer(){
     player.addListener('ready', ({device_id}) => {
       console.log('[SDK] ready, device_id:', device_id);
       state.cleanplayDeviceId = device_id; state.sdkReady = true;
+      // Auto-select as active device if user hasn't picked one yet
+      if(!state.activeDeviceId) state.activeDeviceId = device_id;
       toast('CleanPlay device ready','success');
     });
     player.addListener('not_ready', ({device_id}) => { console.log('[SDK] not_ready', device_id); state.sdkReady = false; });
@@ -817,13 +826,10 @@ function createWebPlayer(){
 }
 
 async function playHere(){
-  if(!state.sdkReady || !state.cleanplayDeviceId){
-    toast('Web player not ready · need Premium + page interaction', 'error');
-    return;
-  }
-  await api('/me/player', 'PUT', {device_ids: [state.cleanplayDeviceId], play: true});
-  setTimeout(fetchState, 800);
-  toast('Playing in this browser', 'success');
+  if(!state.sdkReady || !state.cleanplayDeviceId){toast('Web player not ready · need Premium','error'); return;}
+  state.activeDeviceId = state.cleanplayDeviceId;
+  document.getElementById('device-info').textContent = '▸ CleanPlay (this browser) · selected';
+  toast('CleanPlay selected · pick a song','success');
 }
 
 function showSetup(){
