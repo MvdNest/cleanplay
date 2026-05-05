@@ -532,11 +532,21 @@ async function api(path,method='GET',body=null){
     if(r.status===429){toast('Rate-limited · slow down','error');return null;}
     if(r.status===403){toast('Premium required for this action','error');return null;}
     if(r.status===204)return {};
-    if(!r.ok)return null;
+    if(!r.ok){
+      let errMsg = 'API '+r.status;
+      try{ const eb = await r.json(); if(eb.error?.message) errMsg += ': '+eb.error.message; }catch{}
+      console.warn('API error', path, errMsg);
+      toast(errMsg, 'error');
+      return null;
+    }
     const text = await r.text();
     if(!text)return {};
     try{return JSON.parse(text);}catch{return {};}
-  }catch{return null;}
+  }catch(e){
+    console.warn('Network error', path, e);
+    toast('Network error: '+(e.message||'unknown'), 'error');
+    return null;
+  }
 }
 
 async function fetchState(){
