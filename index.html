@@ -790,7 +790,8 @@ function initWebPlayer(){
 
 function createWebPlayer(){
   if(state.webPlayer) return;
-  if(!state.accessToken) return;
+  if(!state.accessToken) { console.log('[SDK] no token yet, waiting'); return; }
+  console.log('[SDK] creating player');
   try {
     const player = new Spotify.Player({
       name: 'CleanPlay (this browser)',
@@ -798,21 +799,21 @@ function createWebPlayer(){
       volume: 0.8,
     });
     player.addListener('ready', ({device_id}) => {
-      state.cleanplayDeviceId = device_id;
-      state.sdkReady = true;
-      toast('CleanPlay device ready', 'success');
+      console.log('[SDK] ready, device_id:', device_id);
+      state.cleanplayDeviceId = device_id; state.sdkReady = true;
+      toast('CleanPlay device ready','success');
     });
-    player.addListener('not_ready', () => { state.sdkReady = false; });
-    player.addListener('initialization_error', ({message}) => { console.warn('SDK init err:', message); });
-    player.addListener('authentication_error', ({message}) => { console.warn('SDK auth err:', message); toast('SDK auth failed · need Premium', 'error'); });
-    player.addListener('account_error', ({message}) => { console.warn('SDK account err:', message); toast('Premium required for in-browser playback', 'error'); });
-    player.addListener('playback_error', ({message}) => { console.warn('SDK playback err:', message); });
+    player.addListener('not_ready', ({device_id}) => { console.log('[SDK] not_ready', device_id); state.sdkReady = false; });
+    player.addListener('initialization_error', ({message}) => { console.warn('[SDK] init err:', message); toast('SDK init failed: '+message,'error'); });
+    player.addListener('authentication_error', ({message}) => { console.warn('[SDK] auth err:', message); toast('SDK auth failed','error'); });
+    player.addListener('account_error', ({message}) => { console.warn('[SDK] account err:', message); toast('Premium required for in-browser playback','error'); });
+    player.addListener('playback_error', ({message}) => { console.warn('[SDK] playback err:', message); });
     player.connect().then(success => {
+      console.log('[SDK] connect result:', success);
       if(success) state.webPlayer = player;
+      else toast('SDK connect failed · check console','error');
     });
-  } catch(e) {
-    console.warn('WebPlayer create failed:', e);
-  }
+  } catch(e) { console.warn('[SDK] create failed:', e); toast('SDK create error: '+e.message,'error'); }
 }
 
 async function playHere(){
