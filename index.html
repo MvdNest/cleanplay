@@ -321,7 +321,7 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
         </div>
         <div class="device-bar">
           <span id="device-info">— no device —</span>
-          <button onclick="openModal('devices')">Switch device →</button>
+          <span style="display:flex;gap:8px"><button onclick="playHere()" title="Play in this browser (Premium)">▶ Here</button><button onclick="openModal('devices')">Switch device →</button></span>
         </div>
       </section>
       <section class="view" id="view-search">
@@ -401,12 +401,13 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
 <script>
 'use strict';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','user-read-email','user-read-private','streaming'].join(' ');
 const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier'};
-let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null};
+let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false};
 
 async function sha256Hex(text){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 
@@ -761,6 +762,57 @@ function showApp(){
   fetchState();
   startProgressTick();
   state.pollTimer = setInterval(fetchState, 5000);
+  initWebPlayer();
+}
+
+// ════ WEB PLAYBACK SDK ════
+// Allows CleanPlay itself to act as a Spotify Connect device.
+// Requires Spotify Premium.
+function initWebPlayer(){
+  if(state.webPlayer) return;
+  if(typeof Spotify === 'undefined'){
+    // SDK not yet loaded — wait for callback
+    window.onSpotifyWebPlaybackSDKReady = createWebPlayer;
+    return;
+  }
+  createWebPlayer();
+}
+
+function createWebPlayer(){
+  if(state.webPlayer) return;
+  if(!state.accessToken) return;
+  try {
+    const player = new Spotify.Player({
+      name: 'CleanPlay (this browser)',
+      getOAuthToken: cb => cb(state.accessToken),
+      volume: 0.8,
+    });
+    player.addListener('ready', ({device_id}) => {
+      state.cleanplayDeviceId = device_id;
+      state.sdkReady = true;
+      toast('CleanPlay device ready', 'success');
+    });
+    player.addListener('not_ready', () => { state.sdkReady = false; });
+    player.addListener('initialization_error', ({message}) => { console.warn('SDK init err:', message); });
+    player.addListener('authentication_error', ({message}) => { console.warn('SDK auth err:', message); toast('SDK auth failed · need Premium', 'error'); });
+    player.addListener('account_error', ({message}) => { console.warn('SDK account err:', message); toast('Premium required for in-browser playback', 'error'); });
+    player.addListener('playback_error', ({message}) => { console.warn('SDK playback err:', message); });
+    player.connect().then(success => {
+      if(success) state.webPlayer = player;
+    });
+  } catch(e) {
+    console.warn('WebPlayer create failed:', e);
+  }
+}
+
+async function playHere(){
+  if(!state.sdkReady || !state.cleanplayDeviceId){
+    toast('Web player not ready · need Premium + page interaction', 'error');
+    return;
+  }
+  await api('/me/player', 'PUT', {device_ids: [state.cleanplayDeviceId], play: true});
+  setTimeout(fetchState, 800);
+  toast('Playing in this browser', 'success');
 }
 
 function showSetup(){
