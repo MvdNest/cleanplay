@@ -556,7 +556,17 @@ async function fetchState(){
   const data = await api('/me/player');
   if(!data || !data.item){showIdle();return;}
   state.isPlaying=data.is_playing;state.shuffleState=data.shuffle_state;state.repeatState=data.repeat_state;
-  state.localProgress=data.progress_ms||0;state.localDuration=data.item.duration_ms||0;
+  state.localDuration=data.item.duration_ms||0;
+  // Spotify quirk: /me/player returns progress_ms=0 for tracks playing on Web Playback SDK devices.
+  // When the active device is our SDK, prefer the SDK's getCurrentState().position which is accurate.
+  let progress = data.progress_ms || 0;
+  if(state.webPlayer && data.device?.id === state.cleanplayDeviceId){
+    try{
+      const sdkState = await state.webPlayer.getCurrentState();
+      if(sdkState && typeof sdkState.position === 'number') progress = sdkState.position;
+    }catch{}
+  }
+  state.localProgress = progress;
   updateNowPlaying(data);updateControls();
 }
 
@@ -615,16 +625,20 @@ function formatTime(ms){if(!ms||ms<0)return '0:00';const s=Math.floor(ms/1000);r
 function startProgressTick(){
   clearInterval(state.progressTimer);
   state.progressTimer = setInterval(()=>{
+    // Smooth-tick progress only when actively playing
     if(state.isPlaying && state.localDuration){
       state.localProgress += 1000;
       if(state.localProgress > state.localDuration)state.localProgress = state.localDuration;
       updateProgress();
-      if(state.sleepTimerEnd && Date.now() >= state.sleepTimerEnd){
-        api('/me/player/pause','PUT');
-        state.sleepTimerEnd=0;
-        document.getElementById('sleep-status').textContent='Off (timer expired)';
-        toast('Sleep timer · paused','success');
-      }
+    }
+    // Sleep-timer expiry runs every tick regardless of playback state — otherwise a paused
+    // session would never trigger the auto-pause and the status label would stay stuck.
+    if(state.sleepTimerEnd && Date.now() >= state.sleepTimerEnd){
+      if(state.isPlaying) api('/me/player/pause','PUT');
+      state.sleepTimerEnd=0;
+      if(state.sleepTimerInterval){clearInterval(state.sleepTimerInterval);state.sleepTimerInterval=null;}
+      document.getElementById('sleep-status').textContent='Off (timer expired)';
+      toast('Sleep timer · paused','success');
     }
   }, 1000);
 }
@@ -649,7 +663,9 @@ async function doSearch(){
   if(!q)return;
   const results = document.getElementById('search-results');
   results.innerHTML = '<div class="empty"><span class="spinner"></span>searching…</div>';
-  const data = await api('/search?q='+encodeURIComponent(q)+'&type='+state.searchFilter+'&market=from_token');
+  // Spotify dev-mode apps reject limit values >10 with 400. With no limit, the API defaults to 5.
+  // limit=10 is the sweet spot — accepted, and doubles the visible results.
+  const data = await api('/search?q='+encodeURIComponent(q)+'&type='+state.searchFilter+'&market=from_token&limit=10');
   if(!data){results.innerHTML='<div class="empty">search failed</div>';return;}
   let items=[],renderer=null;
   if(state.searchFilter==='track'){items=data.tracks?.items||[];renderer=renderTrackItem;}
@@ -860,6 +876,17 @@ function showSetup(){
 function signOut(){
   clearInterval(state.pollTimer);
   clearInterval(state.progressTimer);
+  if(state.sleepTimerInterval){clearInterval(state.sleepTimerInterval);state.sleepTimerInterval=null;}
+  state.sleepTimerEnd=0;
+  // Disconnect the Web Playback SDK so re-login can create a fresh player with new tokens.
+  if(state.webPlayer){
+    try{ state.webPlayer.disconnect(); }catch{}
+    state.webPlayer=null;
+  }
+  state.cleanplayDeviceId=null;
+  state.sdkReady=false;
+  state.sdkActivated=false;
+  state.activeDeviceId=null;
   state.accessToken=null;state.refreshToken=null;
   localStorage.removeItem(KEYS.accessToken);
   localStorage.removeItem(KEYS.refreshToken);
