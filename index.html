@@ -645,7 +645,7 @@ async function doSearch(){
   if(!q)return;
   const results = document.getElementById('search-results');
   results.innerHTML = '<div class="empty"><span class="spinner"></span>searching…</div>';
-  const data = await api('/search?q='+encodeURIComponent(q)+'&type='+state.searchFilter+'&limit=30');
+  const data = await api('/search?q='+encodeURIComponent(q)+'&type='+state.searchFilter+'&limit=20');
   if(!data){results.innerHTML='<div class="empty">search failed</div>';return;}
   let items=[],renderer=null;
   if(state.searchFilter==='track'){items=data.tracks?.items||[];renderer=renderTrackItem;}
