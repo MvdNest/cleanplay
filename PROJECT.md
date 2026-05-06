@@ -55,20 +55,22 @@ Uses Spotify's **PKCE (Proof Key for Code Exchange)** OAuth flow — modern and 
 7. Receives `access_token` + `refresh_token` + `expires_in`
 8. Tokens stored in localStorage; refresh happens automatically when within 60s of expiry
 
-**Required scopes:**
+**Required scopes** (only what dev-mode lets us actually use):
 ```
 user-read-playback-state
 user-modify-playback-state
 user-read-currently-playing
 user-read-recently-played
-user-library-read
-user-library-modify        ← needed for ♥ like/unlike + album save
+user-library-read           ← /me/tracks, /me/playlists, /me/recently-played
 playlist-read-private
 playlist-read-collaborative
+playlist-modify-private     ← needed for PUT/DELETE /playlists/{id}/followers (save playlist)
 user-read-email
 user-read-private
-streaming
+streaming                   ← required by Web Playback SDK
 ```
+
+Removed scopes (their endpoints are blocked in dev mode regardless): `user-library-modify` (track like / album save), `user-follow-read` + `user-follow-modify` (artist follow), `playlist-modify-public` (we follow privately).
 
 `streaming` is essential for the Web Playback SDK to work.
 
@@ -129,12 +131,13 @@ Once activated in a session, `state.sdkActivated` is set to true and further cal
 | `/me/player` returns `progress_ms: 0` for tracks playing on Web Playback SDK devices | When active device is the cleanplay SDK, read position from `webPlayer.getCurrentState().position` instead |
 | `/artists/{id}/top-tracks` returns 403 Forbidden in dev mode (no extended quota) | Don't enumerate; render an empty-state message and have ▶ Play all fall back to playing the artist URI as a context (Spotify generates radio) |
 | `/playlists/{id}/tracks` returns no items for non-owned public playlists in dev mode | Show a graceful "track list restricted" message; ▶ Play all still works because we have the playlist context URI |
-| Spotify silently auto-redirects PKCE auth without showing the consent screen, even when scopes change | Send `show_dialog=true` on the authorize URL. If the user has already consented to a subset, they may still need to revoke at spotify.com/account/apps to grant a new scope |
 | `POST /me/player/queue?uri=` returns 200 but the subsequent `GET /me/player/queue` repeats the current track 10× when playing a single-URI (non-context) track on an SDK device | Trust the POST status; the GET endpoint is unreliable for SDK-driven sessions and is more accurate when playback is context-driven (album/playlist) |
-| `/me/tracks` and `/me/albums` (both reads `/contains` and writes `PUT/DELETE`) all return **403 Forbidden** in dev mode regardless of scope. Even with `user-library-modify` granted, every call is blocked. | Probe `/me/tracks/contains` once at app startup; if 403, set `body.no-library` and hide all heart buttons + the album save button. Like/save features simply do not work without Extended Quota approval from Spotify. |
-| Playlist follow/unfollow (`PUT/DELETE /playlists/{id}/followers`) **works** in dev mode with `playlist-modify-public` + `playlist-modify-private` scopes — but the corresponding `GET /playlists/{id}/followers/contains` is **403** | Maintain a local `followedPlaylistSet` populated from `/me/playlists` (which works) instead of calling `/contains`. Invalidate the cache on every save toggle |
-| Playlist creation (`POST /users/{id}/playlists`) is **403** in dev mode regardless of scope | Don't expose a "create playlist" UI; users have to create playlists in Spotify proper |
-| Artist follow (`PUT/DELETE /me/following?type=artist`) and the matching `/me/following/contains` are all **403** in dev mode, even with `user-follow-modify` granted. Reading the list (`GET /me/following?type=artist`) does work | Don't expose a follow-artist button; would just fail. Scopes are kept in case Extended Quota is granted later |
+| `POST /me/player/next` and `/previous` return 404 NO_ACTIVE_DEVICE when called without `?device_id=` for SDK-driven sessions | Always include `?device_id={state.activeDeviceId}` on every player control endpoint (handled by `devQS()` helper) |
+| `/me/tracks` (like) and `/me/albums` (save) — both reads `/contains` and writes `PUT/DELETE` — return **403 Forbidden** in dev mode regardless of scope | UI was retired. Liking tracks and saving albums simply do not work in dev mode |
+| Playlist follow/unfollow (`PUT/DELETE /playlists/{id}/followers`) **works** in dev mode with `playlist-modify-private` scope, but `GET /playlists/{id}/followers/contains` is **403** | Maintain a local `followedPlaylistSet` populated from `/me/playlists` (which works); invalidate on every save toggle |
+| Playlist creation (`POST /users/{id}/playlists`) is **403** | No "create playlist" UI — users create in Spotify proper |
+| Artist follow (`PUT/DELETE /me/following?type=artist`) is **403** regardless of scope | UI was retired |
+| Spotify silently auto-redirects PKCE re-auth using the previously-granted scope set, ignoring the new scope list in the URL — even with `show_dialog=true` | If scopes need to change, the user must revoke at `spotify.com/account/apps` to force a fresh consent screen |
 
 ---
 
