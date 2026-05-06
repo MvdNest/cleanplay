@@ -661,7 +661,13 @@ async function forceNextIfStuck(reason, uri){
   _autoAdvanceLastUri = uri || _autoAdvanceLastUri;
   console.log('[Auto-advance] forcing next:', reason);
   await api('/me/player/next' + devQS(false), 'POST', null, {silent:true});
-  setTimeout(fetchState, 1500);
+  // Spotify quirk: when /next is called from a paused/ended state, it advances the
+  // current track but leaves playback paused — the user has to hit play to resume.
+  // Send /play after a small delay so the queued track actually starts on its own.
+  setTimeout(async () => {
+    await api('/me/player/play' + devQS(false), 'PUT', null, {silent:true});
+    fetchState();
+  }, 400);
 }
 
 async function fetchState(){
@@ -1607,20 +1613,4 @@ async function decideNextScreen(){
   state.clientId = savedClientId;
   state.accessToken = savedToken;
   state.refreshToken = savedRefresh;
-  state.tokenExpires = savedExpires;
-  if(savedToken && savedClientId){
-    if(Date.now() < savedExpires || savedRefresh){
-      const ok = await verifyUser();
-      if(ok){showApp();return;}
-    }
-  }
-  showSetup();
-}
-
-window.addEventListener('load',()=>{
-  const needsGate = maybeShowGate();
-  if(!needsGate)decideNextScreen();
-});
-</script>
-</body>
-</html>
+  sta
