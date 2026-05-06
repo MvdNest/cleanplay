@@ -618,7 +618,7 @@ async function fetchState(){
   state.currentTrackId = data.item.id;
   state.currentTrackUri = data.item.uri;
   await updateContextLine(data.context, data.item);
-  updateNowPlaying(data);updateControls();
+  updateNowPlaying(data);updateControls();updateMediaSession(data);
 }
 
 async function updateContextLine(ctx, currentTrack){
@@ -747,6 +747,7 @@ function showIdle(){
   document.getElementById('device-info').textContent='— no device active —';
   state.currentTrackId = null; state.currentTrackUri = null;
   state.currentContextUri = null; state.currentContextName = null; state.currentContextTracks = null;
+  if('mediaSession' in navigator){ navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
 }
 
 function updateControls(){
@@ -802,6 +803,7 @@ async function togglePlay(){
   if(state.isPlaying){await api('/me/player/pause'+devQS(false),'PUT');state.isPlaying=false;}
   else{await api('/me/player/play'+devQS(false),'PUT');state.isPlaying=true;}
   updateControls();
+  if('mediaSession' in navigator) navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
 }
 async function nextTrack(){await api('/me/player/next'+devQS(false),'POST');setTimeout(fetchState,600);}
 async function prevTrack(){await api('/me/player/previous'+devQS(false),'POST');setTimeout(fetchState,600);}
@@ -1110,6 +1112,69 @@ function showApp(){
   startProgressTick();
   state.pollTimer = setInterval(fetchState, 5000);
   initWebPlayer();
+  setupMediaSession();
+}
+
+// ════ MEDIA SESSION (iOS / Android lock screen + hardware media keys) ════
+// Tells the OS what's playing so the lock screen / Control Center / hardware keys
+// drive Spotify. We deliberately omit artwork — CleanPlay never shows album art —
+// so the lock screen falls back to the app icon (the gold "C" favicon).
+function setupMediaSession(){
+  if(!('mediaSession' in navigator)) return;
+  const safe = (fn) => { try{ fn(); }catch{} };
+  safe(()=>navigator.mediaSession.setActionHandler('play', () => togglePlay()));
+  safe(()=>navigator.mediaSession.setActionHandler('pause', () => togglePlay()));
+  safe(()=>navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack()));
+  safe(()=>navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack()));
+  safe(()=>navigator.mediaSession.setActionHandler('seekto', (details) => {
+    if(details.fastSeek === true) return;
+    const ms = Math.max(0, Math.floor((details.seekTime||0) * 1000));
+    state.localProgress = ms;
+    updateProgress();
+    api('/me/player/seek?position_ms='+ms+devQS(true), 'PUT');
+  }));
+  safe(()=>navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+    const skip = (details.seekOffset || 10) * 1000;
+    const ms = Math.max(0, state.localProgress - skip);
+    state.localProgress = ms;
+    updateProgress();
+    api('/me/player/seek?position_ms='+ms+devQS(true), 'PUT');
+  }));
+  safe(()=>navigator.mediaSession.setActionHandler('seekforward', (details) => {
+    const skip = (details.seekOffset || 10) * 1000;
+    const ms = Math.min(state.localDuration||0, state.localProgress + skip);
+    state.localProgress = ms;
+    updateProgress();
+    api('/me/player/seek?position_ms='+ms+devQS(true), 'PUT');
+  }));
+}
+
+function updateMediaSession(data){
+  if(!('mediaSession' in navigator)) return;
+  if(!data || !data.item){
+    navigator.mediaSession.metadata = null;
+    navigator.mediaSession.playbackState = 'none';
+    return;
+  }
+  const t = data.item;
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: t.name || '',
+      artist: (t.artists||[]).map(a=>a.name).join(', '),
+      album: t.album?.name || ''
+      // No artwork — CleanPlay is text-only by design. iOS falls back to the app icon.
+    });
+  }catch{}
+  navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
+  if(t.duration_ms){
+    try{
+      navigator.mediaSession.setPositionState({
+        duration: t.duration_ms / 1000,
+        playbackRate: 1.0,
+        position: Math.min(state.localProgress||0, t.duration_ms) / 1000
+      });
+    }catch{}
+  }
 }
 
 // ════ WEB PLAYBACK SDK ════
