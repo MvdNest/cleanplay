@@ -1046,19 +1046,27 @@ async function loadQueue(){
   const list = document.getElementById('queue-list');
   list.innerHTML = '<div class="empty"><span class="spinner"></span>loading queue…</div>';
   const data = await api('/me/player/queue');
-  if(!data || !data.queue){list.innerHTML='<div class="empty"><div class="empty-art">·</div>no queue available</div>';return;}
+  // Spotify ties the queue to the active playback session. After a hard refresh CleanPlay registers
+  // as a brand-new SDK device, so until the user starts playback (▶ Here, or queueing a track), Spotify
+  // returns no session info and the queue looks empty. We message that case explicitly.
+  const queueArr = (data && Array.isArray(data.queue)) ? data.queue : [];
+  const hasSession = !!(data && data.currently_playing);
+  if(!hasSession && queueArr.length === 0){
+    list.innerHTML = '<div class="empty"><div class="empty-art">·</div>no active playback session<br><br>tap <strong style="color:var(--accent)">▶ Here</strong> on Now Playing<br>or queue a track from Search/Library</div>';
+    return;
+  }
   let html = '';
   if(data.currently_playing){
     html += `<div class="list-section"><div class="list-section-title">Now playing</div></div>`;
     html += `<div class="item playing"><div class="item-num">▸</div><div class="item-content"><div class="item-title">${escapeHtml(data.currently_playing.name)}</div><div class="item-subtitle">${escapeHtml(data.currently_playing.artists.map(a=>a.name).join(', '))}</div></div><div class="item-duration">${formatTime(data.currently_playing.duration_ms)}</div></div>`;
   }
-  if(data.queue.length){
+  if(queueArr.length){
     // Spotify quirk: GET /me/player/queue often reports the same URI 5-10× when playing a
     // single-URI track on an SDK device. Collapse consecutive same-URI rows so the display
     // reflects the actual upcoming variety, not the buggy reporting.
     const deduped = [];
     let lastUri = null;
-    for(const t of data.queue){
+    for(const t of queueArr){
       if(t?.uri && t.uri === lastUri) continue;
       deduped.push(t);
       lastUri = t?.uri;
