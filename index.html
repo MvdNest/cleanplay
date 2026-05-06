@@ -837,7 +837,10 @@ function trackActionsHtml(t){
   return `<div class="item-actions"><button class="icon-btn" onclick="event.stopPropagation();addToQueue('${t.uri}',event)" title="Add to queue">${queueSvg}</button></div>`;
 }
 function renderTrackItem(t,i,contextUri){
-  const click = contextUri ? `playUriInContext('${t.uri}','${contextUri}')` : `playUri('${t.uri}',null)`;
+  // Defensive: only honor a real Spotify URI string. Anything else (e.g. an array leaked from
+  // Array.map's third callback arg) falls back to a single-track play to avoid 400 errors.
+  const ctx = (typeof contextUri === 'string' && contextUri.startsWith('spotify:')) ? contextUri : null;
+  const click = ctx ? `playUriInContext('${t.uri}','${ctx}')` : `playUri('${t.uri}',null)`;
   return `<div class="item" onclick="${click}"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}</div><div class="item-subtitle">${escapeHtml(t.artists.map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div>${trackActionsHtml(t)}<div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;
 }
 function renderArtistItem(a,i){return `<div class="item" onclick="openDetail('artist','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${(a.genres||[]).slice(0,3).join(' · ')||'Artist'}</div><div class="item-meta">${a.followers?.total?a.followers.total.toLocaleString()+' followers':''}</div></div></div>`;}
@@ -1028,7 +1031,9 @@ async function loadQueue(){
   }
   if(data.queue.length){
     html += `<div class="list-section"><div class="list-section-title">Up next <span class="list-section-count">${data.queue.length}</span></div></div>`;
-    html += data.queue.slice(0,25).map(renderTrackItem).join('');
+    // Wrap in arrow fn — Array.map passes (el,i,array); renderTrackItem's third param is contextUri,
+    // and a leaked array there produced "[object Object],…" -> 400 Invalid context uri on click.
+    html += data.queue.slice(0,25).map((t,i)=>renderTrackItem(t,i)).join('');
   } else {
     html += '<div class="empty"><div class="empty-art">·</div>queue is empty</div>';
   }
