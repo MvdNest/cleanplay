@@ -653,9 +653,36 @@ async function api(path,method='GET',body=null,callerOpts){
   }
 }
 
+// Auto-advance fallback: when a single-URI track ends, the SDK occasionally fails to advance
+// to the next item. Track the last URI we forced past so we don't loop on the same end event.
+let _autoAdvanceLastUri = null;
+async function forceNextIfStuck(reason, uri){
+  if(uri && uri === _autoAdvanceLastUri) return;  // already advanced past this track
+  _autoAdvanceLastUri = uri || _autoAdvanceLastUri;
+  console.log('[Auto-advance] forcing next:', reason);
+  await api('/me/player/next' + devQS(false), 'POST', null, {silent:true});
+  setTimeout(fetchState, 1500);
+}
+
 async function fetchState(){
+  // Capture previous state — used by the auto-advance fallback when /me/player returns nothing
+  // immediately after a track was supposed to end.
+  const prevUri = state.currentTrackUri;
+  const prevDur = state.localDuration;
+  const prevProg = state.localProgress;
+  const prevWasPlaying = state.isPlaying;
+
   const data = await api('/me/player');
-  if(!data || !data.item){showIdle();return;}
+  if(!data || !data.item){
+    // CASE A: Spotify reports nothing playing, but we were just at the end of a track.
+    // Likely the SDK stopped without auto-advancing — force /next.
+    if(prevWasPlaying && prevUri && prevDur > 0 && prevProg >= prevDur - 2500){
+      await forceNextIfStuck('no item after expected end', prevUri);
+      return;
+    }
+    showIdle();
+    return;
+  }
   state.isPlaying=data.is_playing;state.shuffleState=data.shuffle_state;state.repeatState=data.repeat_state;
   state.localDuration=data.item.duration_ms||0;
   // Spotify quirk: /me/player returns progress_ms=0 for tracks playing on Web Playback SDK devices.
@@ -668,6 +695,14 @@ async function fetchState(){
     }catch{}
   }
   state.localProgress = progress;
+  // CASE B: Spotify still shows the same track but is paused at the very end — force /next.
+  if(!data.is_playing && state.localDuration > 0 && state.localProgress >= state.localDuration - 1000){
+    forceNextIfStuck('stuck-at-end of '+data.item.uri, data.item.uri);
+  }
+  // Reset the debounce when a track is actively playing well before its end (normal state).
+  if(data.is_playing && state.localDuration > 0 && state.localProgress < state.localDuration - 5000){
+    _autoAdvanceLastUri = null;
+  }
   // Track and context tracking
   state.currentTrackId = data.item.id;
   state.currentTrackUri = data.item.uri;
