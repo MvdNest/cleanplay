@@ -591,21 +591,35 @@ async function verifyUser(){
 
 function setAuthStatus(msg,kind){const el=document.getElementById('auth-status');el.textContent=msg;el.className=kind||'';}
 
-async function api(path,method='GET',body=null){
+async function api(path,method='GET',body=null,callerOpts){
   if(path!=='/me' && !await ensureToken())return null;
-  const opts = {method,headers:{'Authorization':'Bearer '+state.accessToken}};
-  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  const silent = !!(callerOpts && callerOpts.silent);
+  const reqOpts = {method,headers:{'Authorization':'Bearer '+state.accessToken}};
+  if(body){reqOpts.headers['Content-Type']='application/json';reqOpts.body=JSON.stringify(body);}
   try{
-    const r = await fetch('https://api.spotify.com/v1'+path,opts);
-    if(r.status===401){const ok=await refreshTokenFn();if(ok)return api(path,method,body);signOut();return null;}
-    if(r.status===429){toast('Rate-limited · slow down','error');return null;}
-    if(r.status===403){toast('Premium required for this action','error');return null;}
+    const r = await fetch('https://api.spotify.com/v1'+path,reqOpts);
+    if(r.status===401){const ok=await refreshTokenFn();if(ok)return api(path,method,body,callerOpts);signOut();return null;}
+    if(r.status===429){if(!silent) toast('Rate-limited · slow down','error');return null;}
+    if(r.status===403){
+      // 403 in Spotify dev mode rarely means "Premium required" — usually it's a policy
+      // restriction (non-owned playlist tracks, artist top-tracks, library-modify, …). Read
+      // the body to detect a genuine premium block; otherwise show a generic message or
+      // suppress entirely when the caller knows the call is best-effort.
+      let body403 = '';
+      try{ const eb = await r.json(); body403 = eb?.error?.message || ''; }catch{}
+      console.warn('API 403', path, body403);
+      if(!silent){
+        if(/premium/i.test(body403)) toast('Premium required for this action','error');
+        else toast('Restricted by Spotify (dev mode)','error');
+      }
+      return null;
+    }
     if(r.status===204)return {};
     if(!r.ok){
       let errMsg = 'API '+r.status;
       try{ const eb = await r.json(); if(eb.error?.message) errMsg += ': '+eb.error.message; }catch{}
       console.warn('API error', path, errMsg);
-      toast(errMsg, 'error');
+      if(!silent) toast(errMsg, 'error');
       return null;
     }
     const text = await r.text();
@@ -613,7 +627,7 @@ async function api(path,method='GET',body=null){
     try{return JSON.parse(text);}catch{return {};}
   }catch(e){
     console.warn('Network error', path, e);
-    toast('Network error: '+(e.message||'unknown'), 'error');
+    if(!silent) toast('Network error: '+(e.message||'unknown'), 'error');
     return null;
   }
 }
@@ -956,13 +970,23 @@ async function loadAlbumDetail(id){
   document.getElementById('detail-list').innerHTML = html || '<div class="empty">no tracks</div>';
 }
 async function loadPlaylistDetail(id){
-  const [pl, tracks] = await Promise.all([api('/playlists/'+id+'?fields=name,owner.display_name,tracks.total,uri'), api('/playlists/'+id+'/tracks?limit=50&market=from_token&fields=items(track(id,uri,name,duration_ms,explicit,artists(name),album(name)))')]);
+  // /playlists/{id}/tracks is known-restricted in dev mode for non-owned public playlists →
+  // pass silent so the misleading "Premium required" toast doesn't fire on the expected 403.
+  const [pl, tracks] = await Promise.all([
+    api('/playlists/'+id+'?fields=name,owner.display_name,tracks.total,uri'),
+    api('/playlists/'+id+'/tracks?limit=50&market=from_token&fields=items(track(id,uri,name,duration_ms,explicit,artists(name),album(name)))', 'GET', null, {silent:true})
+  ]);
   if(!pl){document.getElementById('detail-list').innerHTML='<div class="empty">playlist unavailable</div>';return;}
   state.detail.uri = pl.uri;
   const items = (tracks?.items||[]).map(it=>it.track).filter(Boolean);
   state.detail.tracks = items;
   document.getElementById('detail-title').textContent = pl.name;
-  document.getElementById('detail-subtitle').textContent = (pl.owner?.display_name?'by '+pl.owner.display_name+' · ':'') + (pl.tracks?.total||items.length) + ' tracks';
+  // If we couldn't read the tracks, say so explicitly instead of "0 tracks".
+  const owner = pl.owner?.display_name ? 'by '+pl.owner.display_name : '';
+  const trackInfo = items.length
+    ? items.length + ' tracks'
+    : (pl.tracks?.total ? pl.tracks.total + ' tracks (track list restricted)' : 'track list restricted');
+  document.getElementById('detail-subtitle').textContent = [owner, trackInfo].filter(Boolean).join(' · ');
   // Determine saved/followed status from cached followedPlaylistSet (Spotify's /contains endpoint
   // is 403 for playlists, so we maintain the set ourselves from /me/playlists).
   await ensureFollowedPlaylists();
@@ -991,7 +1015,11 @@ async function ensureFollowedPlaylists(force){
   _followedLoadedAt = Date.now();
 }
 async function loadArtistDetail(id){
-  const [artist, top] = await Promise.all([api('/artists/'+id), api('/artists/'+id+'/top-tracks?market=from_token')]);
+  // /artists/{id}/top-tracks is always 403 in dev mode → silent so we don't toast misleadingly.
+  const [artist, top] = await Promise.all([
+    api('/artists/'+id),
+    api('/artists/'+id+'/top-tracks?market=from_token', 'GET', null, {silent:true})
+  ]);
   if(!artist){document.getElementById('detail-list').innerHTML='<div class="empty">artist unavailable</div>';return;}
   state.detail.uri = artist.uri;
   state.detail.tracks = top?.tracks || [];
