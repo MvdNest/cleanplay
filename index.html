@@ -88,6 +88,7 @@ input,textarea{font-family:inherit}
 .np-artist{font-family:var(--sans);font-size:clamp(15px,3vw,18px);color:var(--accent);margin-bottom:6px;font-weight:400;word-break:break-word}
 .np-album{font-family:var(--mono);font-size:12px;color:var(--muted);word-break:break-word}
 .np-explicit{display:inline-block;background:var(--surface-2);color:var(--muted);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:1px;margin-left:8px;vertical-align:middle}
+.queue-badge{display:inline-block;background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:3px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:1px;margin-left:8px;vertical-align:middle;text-transform:uppercase}
 .np-idle{text-align:center;padding:64px 24px;color:var(--muted)}
 .np-idle-icon{font-family:var(--serif);font-style:italic;font-size:48px;color:var(--muted-dim);margin-bottom:16px}
 .np-idle p{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;line-height:1.8}
@@ -468,7 +469,7 @@ const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 // Liking tracks, saving albums, and following artists are blocked by Spotify dev-mode policy
 // regardless of scope — those scopes have been removed since the corresponding UI was retired.
 const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','playlist-modify-private','user-read-email','user-read-private','streaming'].join(' ');
-const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier'};
+const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier',recentQueued:'cp_recent_queued'};
 let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false,currentTrackId:null,currentTrackUri:null,currentContextUri:null,currentContextType:null,currentContextName:null,currentContextOwner:null,currentContextTracks:null,detail:null,prevView:'now-playing'};
 const followedPlaylistSet = new Set(); // playlist IDs in /me/playlists (owned or followed)
 const contextNameCache = new Map();   // uri -> {name, owner, tracks?}
@@ -859,12 +860,13 @@ function trackActionsHtml(t){
   const queueSvg = '<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h10v-2H7v2zm0 4h10v-2H7v2zM7 7v2h14V7H7zm12 4h-2v2h-2v2h2v2h2v-2h2v-2h-2z"/></svg>';
   return `<div class="item-actions"><button class="icon-btn" onclick="event.stopPropagation();addToQueue('${t.uri}',event)" title="Add to queue">${queueSvg}</button></div>`;
 }
-function renderTrackItem(t,i,contextUri){
+function renderTrackItem(t,i,contextUri,extraBadgeHtml){
   // Defensive: only honor a real Spotify URI string. Anything else (e.g. an array leaked from
   // Array.map's third callback arg) falls back to a single-track play to avoid 400 errors.
   const ctx = (typeof contextUri === 'string' && contextUri.startsWith('spotify:')) ? contextUri : null;
   const click = ctx ? `playUriInContext('${t.uri}','${ctx}')` : `playUri('${t.uri}',null)`;
-  return `<div class="item" onclick="${click}"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}</div><div class="item-subtitle">${escapeHtml(t.artists.map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div>${trackActionsHtml(t)}<div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;
+  const badge = extraBadgeHtml || '';
+  return `<div class="item" onclick="${click}"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}${badge}</div><div class="item-subtitle">${escapeHtml(t.artists.map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div>${trackActionsHtml(t)}<div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;
 }
 function renderArtistItem(a,i){return `<div class="item" onclick="openDetail('artist','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${(a.genres||[]).slice(0,3).join(' · ')||'Artist'}</div><div class="item-meta">${a.followers?.total?a.followers.total.toLocaleString()+' followers':''}</div></div></div>`;}
 function renderAlbumItem(a,i){return `<div class="item" onclick="openDetail('album','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${escapeHtml(a.artists.map(ar=>ar.name).join(', '))}</div><div class="item-meta">${a.album_type} · ${a.total_tracks} tracks · ${a.release_date?.slice(0,4)||''}</div></div></div>`;}
@@ -888,11 +890,34 @@ async function playUris(uris){
 }
 
 // ════ QUEUE A TRACK ════
+// Spotify's /me/player/queue endpoint mixes user-queued items with autoplay-generated items
+// in its response without telling us which is which. We remember every URI the user adds via
+// the + button (6h TTL) so the Queue view can label "queued" rows distinctly from autoplay.
+const QUEUED_TTL_MS = 6*60*60*1000;
+function recordQueueAdd(uri){
+  try{
+    let list = JSON.parse(localStorage.getItem(KEYS.recentQueued) || '[]');
+    list.push({uri, ts: Date.now()});
+    const cutoff = Date.now() - QUEUED_TTL_MS;
+    list = list.filter(x => x && x.ts > cutoff).slice(-50);
+    localStorage.setItem(KEYS.recentQueued, JSON.stringify(list));
+  }catch{}
+}
+function getRecentQueuedUris(){
+  try{
+    const list = JSON.parse(localStorage.getItem(KEYS.recentQueued) || '[]');
+    const cutoff = Date.now() - QUEUED_TTL_MS;
+    return new Set(list.filter(x => x && x.ts > cutoff).map(x => x.uri));
+  }catch{ return new Set(); }
+}
 async function addToQueue(trackUri, ev){
   if(ev) ev.stopPropagation();
   const path = '/me/player/queue?uri=' + encodeURIComponent(trackUri) + (state.activeDeviceId?'&device_id='+state.activeDeviceId:'');
   const r = await api(path, 'POST');
-  if(r !== null) toast('Added to queue','success');
+  if(r !== null){
+    recordQueueAdd(trackUri);
+    toast('Added to queue','success');
+  }
 }
 
 // ════ DETAIL VIEW (playlist / album / artist drill-down) ════
@@ -1072,9 +1097,13 @@ async function loadQueue(){
       lastUri = t?.uri;
     }
     html += `<div class="list-section"><div class="list-section-title">Up next <span class="list-section-count">${deduped.length}</span></div></div>`;
-    // Wrap in arrow fn — Array.map passes (el,i,array); renderTrackItem's third param is contextUri,
-    // and a leaked array there produced "[object Object],…" -> 400 Invalid context uri on click.
-    html += deduped.slice(0,25).map((t,i)=>renderTrackItem(t,i)).join('');
+    // Mark rows the user explicitly queued via the + button so they stand out from autoplay
+    // (Spotify's /me/player/queue mixes both kinds without flagging them).
+    const userQueued = getRecentQueuedUris();
+    html += deduped.slice(0,25).map((t,i) => {
+      const badge = (t?.uri && userQueued.has(t.uri)) ? '<span class="queue-badge">queued</span>' : '';
+      return renderTrackItem(t, i, null, badge);
+    }).join('');
   } else {
     html += '<div class="empty"><div class="empty-art">·</div>queue is empty</div>';
   }
