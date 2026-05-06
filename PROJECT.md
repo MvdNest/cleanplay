@@ -131,6 +131,7 @@ Once activated in a session, `state.sdkActivated` is set to true and further cal
 | `/playlists/{id}/tracks` returns no items for non-owned public playlists in dev mode | Show a graceful "track list restricted" message; ▶ Play all still works because we have the playlist context URI |
 | Spotify silently auto-redirects PKCE auth without showing the consent screen, even when scopes change | Send `show_dialog=true` on the authorize URL. If the user has already consented to a subset, they may still need to revoke at spotify.com/account/apps to grant a new scope |
 | `POST /me/player/queue?uri=` returns 200 but the subsequent `GET /me/player/queue` repeats the current track 10× when playing a single-URI (non-context) track on an SDK device | Trust the POST status; the GET endpoint is unreliable for SDK-driven sessions and is more accurate when playback is context-driven (album/playlist) |
+| `/me/tracks` and `/me/albums` (both reads `/contains` and writes `PUT/DELETE`) all return **403 Forbidden** in dev mode regardless of scope. Even with `user-library-modify` granted, every call is blocked. | Probe `/me/tracks/contains` once at app startup; if 403, set `body.no-library` and hide all heart buttons + the album save button. Like/save features simply do not work without Extended Quota approval from Spotify. |
 
 ---
 

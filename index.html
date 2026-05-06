@@ -172,6 +172,7 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .btn-accent:hover{background:var(--accent-bright)}
 .btn-accent:active{transform:scale(0.98)}
 .detail-actions .btn-ghost{padding:10px 14px;font-size:10px}
+body.no-library .heart-btn,body.no-library #detail-save,body.no-library .np-secondary-row{display:none !important}
 .tabs{position:fixed;bottom:0;left:0;right:0;background:rgba(13,13,14,0.92);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:8px 0 calc(8px + var(--safe-bottom));z-index:100;justify-content:space-around}
 .tab{flex:1;background:none;border:none;color:var(--muted);padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:color 0.2s;max-width:100px}
 .tab svg{width:22px;height:22px;fill:currentColor}
@@ -830,6 +831,7 @@ async function playUris(uris){
 
 // ════ LIKE / SAVE TRACKS ════
 async function checkLikedStatus(trackIds){
+  if(state.libraryWritable === false) return; // dev-mode block; skip the API call entirely
   const ids = (trackIds||[]).filter(Boolean).slice(0,50);
   if(!ids.length) return;
   const res = await api('/me/tracks/contains?ids='+ids.join(','));
@@ -1107,6 +1109,21 @@ function showApp(){
   startProgressTick();
   state.pollTimer = setInterval(fetchState, 5000);
   initWebPlayer();
+  probeLibraryAccess();
+}
+
+// Spotify dev-mode apps (no extended quota) are blocked from /me/tracks and /me/albums
+// — both reads and writes. Probe once and hide heart UI if the policy is in effect, so
+// users don't see buttons that silently fail. Use a known popular-track ID for the probe.
+async function probeLibraryAccess(){
+  if(!state.accessToken) return;
+  try{
+    const r = await fetch('https://api.spotify.com/v1/me/tracks/contains?ids=1lbXEepatjRVjoG8pZMtdp', {headers:{'Authorization':'Bearer '+state.accessToken}});
+    const ok = r.status === 200;
+    state.libraryWritable = ok;
+    document.body.classList.toggle('no-library', !ok);
+    if(!ok) console.log('[CleanPlay] Library API restricted by Spotify dev-mode policy — heart buttons hidden');
+  }catch{ document.body.classList.add('no-library'); }
 }
 
 // ════ WEB PLAYBACK SDK ════
