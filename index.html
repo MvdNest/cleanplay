@@ -1286,9 +1286,16 @@ function updateLyricsHighlight(){
     const el = document.querySelector('.lyrics-line[data-i="'+idx+'"]');
     const container = document.getElementById('lyrics-content');
     if(el && container){
-      // keep the active line ~1/3 from top of the visible panel
-      const target = el.offsetTop - container.clientHeight/3;
-      container.scrollTo({top: Math.max(0,target), behavior:'smooth'});
+      // Use getBoundingClientRect: el.offsetTop is measured from the nearest *positioned*
+      // ancestor (which isn't our container by default), so it overshot the scroll math.
+      // Compute the line's position relative to the container's scroll origin instead.
+      const elRect = el.getBoundingClientRect();
+      const cRect = container.getBoundingClientRect();
+      const elTopInContainer = (elRect.top - cRect.top) + container.scrollTop;
+      // Keep the active line ~1/3 from the top of the visible panel
+      const target = elTopInContainer - container.clientHeight/3;
+      const max = container.scrollHeight - container.clientHeight;
+      container.scrollTo({top: Math.max(0, Math.min(max, target)), behavior:'smooth'});
     }
   }
   lyricsActiveLineIdx = idx;
