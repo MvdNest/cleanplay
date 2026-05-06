@@ -1516,6 +1516,24 @@ function createWebPlayer(){
     player.addListener('authentication_error', ({message}) => { console.warn('[SDK] auth err:', message); toast('SDK auth failed','error'); });
     player.addListener('account_error', ({message}) => { console.warn('[SDK] account err:', message); toast('Premium required for in-browser playback','error'); });
     player.addListener('playback_error', ({message}) => { console.warn('[SDK] playback err:', message); });
+    // End-of-track detection: when a single-URI track finishes, the SDK often pauses at
+    // position 0 instead of auto-advancing — even if /me/player/queue has items waiting.
+    // The 5s polling fallback in fetchState() eventually catches this, but listening to
+    // player_state_changed lets us advance within ~200ms instead of up to 5s.
+    // Spotify's signature for "track just ended without auto-advance":
+    //   paused === true, position === 0, and previous_tracks[0] is the URI we were playing.
+    player.addListener('player_state_changed', (s) => {
+      if(!s) return;
+      const curUri = s.track_window?.current_track?.uri;
+      const prevTrackUri = s.track_window?.previous_tracks?.[0]?.uri;
+      const ended = s.paused && s.position === 0 && prevTrackUri && prevTrackUri === state._lastSdkPlayingUri;
+      if(ended){
+        console.log('[SDK] end-of-track detected via player_state_changed:', prevTrackUri);
+        forceNextIfStuck('SDK player_state_changed: track ended', prevTrackUri);
+      }
+      // Track the URI of whatever is currently playing so the next end event has a reference.
+      if(curUri && !s.paused) state._lastSdkPlayingUri = curUri;
+    });
     player.connect().then(success => {
       console.log('[SDK] connect result:', success);
       if(success) state.webPlayer = player;
