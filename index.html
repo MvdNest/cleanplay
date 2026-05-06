@@ -924,10 +924,14 @@ async function loadPlaylistDetail(id){
   state.detail.tracks = items;
   document.getElementById('detail-title').textContent = pl.name;
   document.getElementById('detail-subtitle').textContent = (pl.owner?.display_name?'by '+pl.owner.display_name+' · ':'') + (pl.tracks?.total||items.length) + ' tracks';
+  if(!items.length){
+    document.getElementById('detail-list').innerHTML = '<div class="empty"><div class="empty-art">·</div>track list restricted by Spotify for this playlist<br>use ▶ Play all to start it anyway</div>';
+    return;
+  }
   const ids = items.map(t=>t?.id).filter(Boolean);
   await checkLikedStatus(ids);
   const html = items.map((t,i)=>renderTrackItem(t, i, pl.uri)).join('');
-  document.getElementById('detail-list').innerHTML = html || '<div class="empty">no tracks</div>';
+  document.getElementById('detail-list').innerHTML = html;
 }
 async function loadArtistDetail(id){
   const [artist, top] = await Promise.all([api('/artists/'+id), api('/artists/'+id+'/top-tracks?market=from_token')]);
@@ -937,19 +941,23 @@ async function loadArtistDetail(id){
   document.getElementById('detail-title').textContent = artist.name;
   const sub = (artist.genres||[]).slice(0,3).join(' · ') || 'Artist';
   const followers = artist.followers?.total ? ' · '+artist.followers.total.toLocaleString()+' followers' : '';
-  document.getElementById('detail-subtitle').textContent = sub + followers + ' · top tracks';
+  document.getElementById('detail-subtitle').textContent = sub + followers + (state.detail.tracks.length?' · top tracks':'');
+  if(!state.detail.tracks.length){
+    document.getElementById('detail-list').innerHTML = '<div class="empty"><div class="empty-art">·</div>top tracks restricted by Spotify for this app<br>use ▶ Play all to start the artist radio</div>';
+    return;
+  }
   const ids = state.detail.tracks.map(t=>t.id).filter(Boolean);
   await checkLikedStatus(ids);
   // Artists have no useful context_uri for offset-play — use plain URIs list
   const html = state.detail.tracks.map((t,i)=>renderTrackItem(t, i, null)).join('');
-  document.getElementById('detail-list').innerHTML = html || '<div class="empty">no top tracks</div>';
+  document.getElementById('detail-list').innerHTML = html;
 }
 async function detailPlayAll(){
   if(!state.detail) return;
   if(state.detail.type === 'artist'){
     const uris = state.detail.tracks.map(t=>t.uri).filter(Boolean);
-    if(!uris.length) return;
-    await playUris(uris);
+    if(uris.length) await playUris(uris);
+    else await playArtist(state.detail.uri);   // fallback when top-tracks endpoint is restricted
   } else {
     // album / playlist — start at track 0 in context
     const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');

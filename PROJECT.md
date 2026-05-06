@@ -127,6 +127,10 @@ Once activated in a session, `state.sdkActivated` is set to true and further cal
 | Web Playback SDK silent on iOS without `activateElement()` | Call it inside any user click handler |
 | `/me/player` returns 204 (not 404) when no playback active | Treat as idle, not error |
 | `/me/player` returns `progress_ms: 0` for tracks playing on Web Playback SDK devices | When active device is the cleanplay SDK, read position from `webPlayer.getCurrentState().position` instead |
+| `/artists/{id}/top-tracks` returns 403 Forbidden in dev mode (no extended quota) | Don't enumerate; render an empty-state message and have ▶ Play all fall back to playing the artist URI as a context (Spotify generates radio) |
+| `/playlists/{id}/tracks` returns no items for non-owned public playlists in dev mode | Show a graceful "track list restricted" message; ▶ Play all still works because we have the playlist context URI |
+| Spotify silently auto-redirects PKCE auth without showing the consent screen, even when scopes change | Send `show_dialog=true` on the authorize URL. If the user has already consented to a subset, they may still need to revoke at spotify.com/account/apps to grant a new scope |
+| `POST /me/player/queue?uri=` returns 200 but the subsequent `GET /me/player/queue` repeats the current track 10× when playing a single-URI (non-context) track on an SDK device | Trust the POST status; the GET endpoint is unreliable for SDK-driven sessions and is more accurate when playback is context-driven (album/playlist) |
 
 ---
 
