@@ -761,18 +761,25 @@ function startProgressTick(){
   }, 1000);
 }
 
+// Spotify control endpoints require ?device_id= when the active device is a Web Playback SDK
+// device — without it, /me/player/next and /me/player/previous return 404 NO_ACTIVE_DEVICE.
+// Build the query suffix once so every control call is consistent.
+function devQS(initial){
+  const sep = initial ? '&' : '?';
+  return state.activeDeviceId ? sep+'device_id='+state.activeDeviceId : '';
+}
 async function togglePlay(){
   activateSdkAudio();
-  if(state.isPlaying){await api('/me/player/pause','PUT');state.isPlaying=false;}
-  else{await api('/me/player/play','PUT');state.isPlaying=true;}
+  if(state.isPlaying){await api('/me/player/pause'+devQS(false),'PUT');state.isPlaying=false;}
+  else{await api('/me/player/play'+devQS(false),'PUT');state.isPlaying=true;}
   updateControls();
 }
-async function nextTrack(){await api('/me/player/next','POST');setTimeout(fetchState,600);}
-async function prevTrack(){await api('/me/player/previous','POST');setTimeout(fetchState,600);}
-async function toggleShuffle(){state.shuffleState=!state.shuffleState;await api('/me/player/shuffle?state='+state.shuffleState,'PUT');updateControls();}
-async function toggleRepeat(){const modes=['off','context','track'];state.repeatState=modes[(modes.indexOf(state.repeatState)+1)%modes.length];await api('/me/player/repeat?state='+state.repeatState,'PUT');updateControls();toast('Repeat: '+state.repeatState);}
-async function setVolume(val){document.getElementById('vol-pct').textContent=val;await api('/me/player/volume?volume_percent='+val,'PUT');}
-async function seekTo(e){if(!state.localDuration)return;const rect=e.currentTarget.getBoundingClientRect();const pct=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));const ms=Math.floor(pct*state.localDuration);state.localProgress=ms;updateProgress();await api('/me/player/seek?position_ms='+ms,'PUT');}
+async function nextTrack(){await api('/me/player/next'+devQS(false),'POST');setTimeout(fetchState,600);}
+async function prevTrack(){await api('/me/player/previous'+devQS(false),'POST');setTimeout(fetchState,600);}
+async function toggleShuffle(){state.shuffleState=!state.shuffleState;await api('/me/player/shuffle?state='+state.shuffleState+devQS(true),'PUT');updateControls();}
+async function toggleRepeat(){const modes=['off','context','track'];state.repeatState=modes[(modes.indexOf(state.repeatState)+1)%modes.length];await api('/me/player/repeat?state='+state.repeatState+devQS(true),'PUT');updateControls();toast('Repeat: '+state.repeatState);}
+async function setVolume(val){document.getElementById('vol-pct').textContent=val;await api('/me/player/volume?volume_percent='+val+devQS(true),'PUT');}
+async function seekTo(e){if(!state.localDuration)return;const rect=e.currentTarget.getBoundingClientRect();const pct=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));const ms=Math.floor(pct*state.localDuration);state.localProgress=ms;updateProgress();await api('/me/player/seek?position_ms='+ms+devQS(true),'PUT');}
 
 function setSearchFilter(filter){state.searchFilter=filter;document.querySelectorAll('.filter-pill').forEach(p=>p.classList.toggle('active',p.dataset.filter===filter));if(document.getElementById('search-input').value.trim())doSearch();}
 
