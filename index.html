@@ -146,6 +146,32 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .item-duration{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0;letter-spacing:0.5px}
 .empty{text-align:center;padding:60px 24px;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;line-height:1.8}
 .empty-art{font-family:var(--serif);font-style:italic;font-size:56px;color:var(--muted-dim);margin-bottom:16px}
+.item-actions{display:flex;gap:2px;align-items:center;flex-shrink:0;margin-left:6px}
+.icon-btn{background:none;border:none;color:var(--muted);padding:7px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.icon-btn svg{width:16px;height:16px;fill:currentColor;display:block}
+.icon-btn:hover{color:var(--accent);background:var(--surface-2)}
+.icon-btn:active{transform:scale(0.92)}
+.heart-btn svg path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+.heart-btn.liked svg path{fill:currentColor;stroke:none}
+.heart-btn.liked{color:var(--accent)}
+.np-context{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:10px;line-height:1.5}
+.np-context .ctx-link{color:var(--text-soft);cursor:pointer;border-bottom:1px dotted var(--muted-dim);transition:color 0.2s;padding-bottom:1px}
+.np-context .ctx-link:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.np-context .ctx-pos{color:var(--muted-dim);margin-left:6px}
+.np-secondary-row{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border-soft)}
+.np-secondary-row .icon-btn{padding:6px 8px}
+.np-secondary-row .icon-btn svg{width:18px;height:18px}
+.np-secondary-row .icon-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
+.detail-header{padding:24px 24px 16px;border-bottom:1px solid var(--border-soft);display:flex;flex-direction:column;gap:8px}
+.detail-back{align-self:flex-start;background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:6px 0;cursor:pointer;transition:color 0.15s}
+.detail-back:hover{color:var(--accent)}
+.detail-title{font-family:var(--serif);font-style:italic;font-size:32px;color:var(--text);font-weight:500;letter-spacing:-0.5px;line-height:1.2;word-break:break-word}
+.detail-subtitle{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;word-break:break-word}
+.detail-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center}
+.btn-accent{background:var(--accent);color:#1a1408;border:none;padding:10px 18px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;border-radius:6px;cursor:pointer;transition:background 0.15s}
+.btn-accent:hover{background:var(--accent-bright)}
+.btn-accent:active{transform:scale(0.98)}
+.detail-actions .btn-ghost{padding:10px 14px;font-size:10px}
 .tabs{position:fixed;bottom:0;left:0;right:0;background:rgba(13,13,14,0.92);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:8px 0 calc(8px + var(--safe-bottom));z-index:100;justify-content:space-around}
 .tab{flex:1;background:none;border:none;color:var(--muted);padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:color 0.2s;max-width:100px}
 .tab svg{width:22px;height:22px;fill:currentColor}
@@ -301,6 +327,11 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
             <div class="np-track" id="np-track">—</div>
             <div class="np-artist" id="np-artist">—</div>
             <div class="np-album" id="np-album">—</div>
+            <div class="np-context" id="np-context" style="display:none">from <span class="ctx-link" id="np-context-link"></span><span class="ctx-pos" id="np-context-pos"></span></div>
+            <div class="np-secondary-row" id="np-secondary-row" style="display:none">
+              <button class="icon-btn heart-btn" id="btn-like" onclick="likeCurrentTrack()" title="Like / unlike (Spotify saved)"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></button>
+              <span class="icon-label" id="btn-like-label">like</span>
+            </div>
           </div>
         </div>
         <div class="progress-area">
@@ -347,6 +378,18 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
       <section class="view" id="view-queue">
         <div class="view-header"><h1 class="view-title">Queue</h1></div>
         <div id="queue-list"><div class="empty"><div class="empty-art">·</div>queue is empty</div></div>
+      </section>
+      <section class="view" id="view-detail">
+        <div class="detail-header">
+          <button class="detail-back" onclick="closeDetail()">← Back</button>
+          <h1 class="detail-title" id="detail-title">—</h1>
+          <div class="detail-subtitle" id="detail-subtitle">—</div>
+          <div class="detail-actions">
+            <button class="btn-accent" id="detail-play-all" onclick="detailPlayAll()">▶ Play all</button>
+            <button class="btn-ghost icon-btn heart-btn" id="detail-save" onclick="detailToggleSave()" title="Save album / playlist" style="display:none;width:auto;padding:10px 14px;gap:8px"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg><span id="detail-save-label">Save</span></button>
+          </div>
+        </div>
+        <div id="detail-list"><div class="empty"><span class="spinner"></span>loading…</div></div>
       </section>
       <section class="view" id="view-settings">
         <div class="view-header"><h1 class="view-title">Settings</h1></div>
@@ -410,7 +453,10 @@ window.onSpotifyWebPlaybackSDKReady = function(){ window._sdkReady = true; if(ty
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','user-read-email','user-read-private','streaming'].join(' ');
 const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier'};
-let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false};
+let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false,currentTrackId:null,currentTrackUri:null,currentContextUri:null,currentContextType:null,currentContextName:null,currentContextOwner:null,currentContextTracks:null,detail:null,prevView:'now-playing'};
+const likedSet = new Set();          // track IDs known to be liked
+const savedAlbumSet = new Set();      // album IDs known to be saved
+const contextNameCache = new Map();   // uri -> {name, owner, tracks?}
 
 async function sha256Hex(text){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 
@@ -567,7 +613,74 @@ async function fetchState(){
     }catch{}
   }
   state.localProgress = progress;
-  updateNowPlaying(data);updateControls();
+  // Track and context tracking
+  const tid = data.item.id;
+  const turi = data.item.uri;
+  const trackChanged = (tid !== state.currentTrackId);
+  state.currentTrackId = tid;
+  state.currentTrackUri = turi;
+  if(trackChanged && tid){ checkLikedStatus([tid]); }
+  await updateContextLine(data.context, data.item);
+  updateNowPlaying(data);updateControls();refreshLikeUi();
+}
+
+async function updateContextLine(ctx, currentTrack){
+  const el = document.getElementById('np-context');
+  const linkEl = document.getElementById('np-context-link');
+  const posEl = document.getElementById('np-context-pos');
+  if(!ctx || !ctx.uri){
+    if(el) el.style.display = 'none';
+    state.currentContextUri = null; state.currentContextType = null; state.currentContextName = null; state.currentContextOwner = null; state.currentContextTracks = null;
+    return;
+  }
+  if(ctx.uri !== state.currentContextUri){
+    state.currentContextUri = ctx.uri;
+    state.currentContextType = ctx.type;
+    // resolve name (cached)
+    let info = contextNameCache.get(ctx.uri);
+    if(!info){
+      const id = ctx.uri.split(':').pop();
+      let endpoint = null, fields = '';
+      if(ctx.type === 'album') endpoint = '/albums/'+id;
+      else if(ctx.type === 'playlist') endpoint = '/playlists/'+id+'?fields=name,owner.display_name';
+      else if(ctx.type === 'artist') endpoint = '/artists/'+id;
+      else if(ctx.type === 'show') endpoint = '/shows/'+id+'?market=from_token';
+      else { info = {name: ctx.type}; }
+      if(endpoint){
+        const obj = await api(endpoint);
+        info = {name: obj?.name || ctx.type, owner: obj?.owner?.display_name || null};
+      }
+      // For playlist/album also cache track URIs to compute "track N of M"
+      if(ctx.type === 'playlist'){
+        const tlist = await api('/playlists/'+ctx.uri.split(':').pop()+'/tracks?limit=100&fields=items(track(uri))');
+        info.trackUris = (tlist?.items||[]).map(it=>it.track?.uri).filter(Boolean);
+        info.total = info.trackUris.length;
+      } else if(ctx.type === 'album'){
+        const tlist = await api('/albums/'+ctx.uri.split(':').pop()+'/tracks?limit=50');
+        info.trackUris = (tlist?.items||[]).map(it=>it.uri).filter(Boolean);
+        info.total = info.trackUris.length;
+      }
+      contextNameCache.set(ctx.uri, info);
+    }
+    state.currentContextName = info.name;
+    state.currentContextOwner = info.owner;
+    state.currentContextTracks = info.trackUris || null;
+  }
+  // Compute track N of M when applicable
+  let posLabel = '';
+  if(state.currentContextTracks && currentTrack){
+    const idx = state.currentContextTracks.indexOf(currentTrack.uri);
+    if(idx >= 0) posLabel = '· track '+(idx+1)+' of '+state.currentContextTracks.length;
+  }
+  if(linkEl){
+    linkEl.textContent = state.currentContextName || ctx.type;
+    linkEl.onclick = () => {
+      const id = state.currentContextUri.split(':').pop();
+      openDetail(state.currentContextType, id, state.currentContextName, state.currentContextUri);
+    };
+  }
+  if(posEl) posEl.textContent = posLabel;
+  if(el) el.style.display = 'block';
 }
 
 function updateNowPlaying(data){
@@ -600,6 +713,8 @@ function showIdle(){
   document.getElementById('np-info').style.display='none';
   document.getElementById('status-dot').classList.remove('live');
   document.getElementById('device-info').textContent='— no device active —';
+  state.currentTrackId = null; state.currentTrackUri = null;
+  state.currentContextUri = null; state.currentContextName = null; state.currentContextTracks = null;
 }
 
 function updateControls(){
@@ -676,13 +791,195 @@ async function doSearch(){
   results.innerHTML = items.map((item,i)=>renderer(item,i)).join('');
 }
 
-function renderTrackItem(t,i){return `<div class="item" onclick="playUri('${t.uri}',null)"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}</div><div class="item-subtitle">${escapeHtml(t.artists.map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div><div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;}
-function renderArtistItem(a,i){return `<div class="item" onclick="playArtist('${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${(a.genres||[]).slice(0,3).join(' · ')||'Artist'}</div><div class="item-meta">${a.followers?.total?a.followers.total.toLocaleString()+' followers':''}</div></div></div>`;}
-function renderAlbumItem(a,i){return `<div class="item" onclick="playUri(null,'${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${escapeHtml(a.artists.map(ar=>ar.name).join(', '))}</div><div class="item-meta">${a.album_type} · ${a.total_tracks} tracks · ${a.release_date?.slice(0,4)||''}</div></div></div>`;}
-function renderPlaylistItem(p,i){return `<div class="item" onclick="playUri(null,'${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${p.tracks?.total||0} tracks</div></div></div>`;}
+function trackActionsHtml(t){
+  const id = t.id || (t.uri||'').replace('spotify:track:','');
+  const liked = likedSet.has(id);
+  const heartSvg = '<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+  const queueSvg = '<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h10v-2H7v2zm0 4h10v-2H7v2zM7 7v2h14V7H7zm12 4h-2v2h-2v2h2v2h2v-2h2v-2h-2z"/></svg>';
+  return `<div class="item-actions">`+
+    `<button class="icon-btn heart-btn ${liked?'liked':''}" data-track-id="${id}" onclick="event.stopPropagation();toggleLike('${t.uri}',this)" title="Like / unlike">${heartSvg}</button>`+
+    `<button class="icon-btn" onclick="event.stopPropagation();addToQueue('${t.uri}',event)" title="Add to queue">${queueSvg}</button>`+
+  `</div>`;
+}
+function renderTrackItem(t,i,contextUri){
+  const click = contextUri ? `playUriInContext('${t.uri}','${contextUri}')` : `playUri('${t.uri}',null)`;
+  return `<div class="item" onclick="${click}"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}</div><div class="item-subtitle">${escapeHtml(t.artists.map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div>${trackActionsHtml(t)}<div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;
+}
+function renderArtistItem(a,i){return `<div class="item" onclick="openDetail('artist','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${(a.genres||[]).slice(0,3).join(' · ')||'Artist'}</div><div class="item-meta">${a.followers?.total?a.followers.total.toLocaleString()+' followers':''}</div></div></div>`;}
+function renderAlbumItem(a,i){return `<div class="item" onclick="openDetail('album','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${escapeHtml(a.artists.map(ar=>ar.name).join(', '))}</div><div class="item-meta">${a.album_type} · ${a.total_tracks} tracks · ${a.release_date?.slice(0,4)||''}</div></div></div>`;}
+function renderPlaylistItem(p,i){return `<div class="item" onclick="openDetail('playlist','${p.id}','${escapeAttr(p.name)}','${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${p.tracks?.total||0} tracks</div></div></div>`;}
+function escapeAttr(s){return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 async function playUri(trackUri,contextUri){activateSdkAudio();const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
 async function playArtist(artistUri){activateSdkAudio();const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
+async function playUriInContext(trackUri,contextUri){
+  activateSdkAudio();
+  const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');
+  await api(path,'PUT',{context_uri:contextUri,offset:{uri:trackUri}});
+  setTimeout(fetchState,1000);switchView('now-playing');
+}
+async function playUris(uris){
+  // play a list of track URIs (used for artist top-tracks where we have no context)
+  activateSdkAudio();
+  const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');
+  await api(path,'PUT',{uris});
+  setTimeout(fetchState,1000);switchView('now-playing');
+}
+
+// ════ LIKE / SAVE TRACKS ════
+async function checkLikedStatus(trackIds){
+  const ids = (trackIds||[]).filter(Boolean).slice(0,50);
+  if(!ids.length) return;
+  const res = await api('/me/tracks/contains?ids='+ids.join(','));
+  if(!Array.isArray(res)) return;
+  ids.forEach((id,i)=>{ if(res[i]) likedSet.add(id); else likedSet.delete(id); });
+  // refresh visible buttons
+  document.querySelectorAll('.heart-btn[data-track-id]').forEach(el=>{
+    el.classList.toggle('liked', likedSet.has(el.dataset.trackId));
+  });
+}
+async function toggleLike(trackUri, btn){
+  const id = trackUri.replace('spotify:track:','');
+  const wasLiked = likedSet.has(id);
+  // optimistic
+  if(wasLiked){likedSet.delete(id); btn?.classList.remove('liked');}
+  else {likedSet.add(id); btn?.classList.add('liked');}
+  const r = await api('/me/tracks?ids='+id, wasLiked?'DELETE':'PUT');
+  if(r === null){ // revert on failure
+    if(wasLiked){likedSet.add(id); btn?.classList.add('liked');}
+    else {likedSet.delete(id); btn?.classList.remove('liked');}
+    return;
+  }
+  // sync any other visible buttons + the NP heart
+  document.querySelectorAll('.heart-btn[data-track-id="'+id+'"]').forEach(el=>el.classList.toggle('liked', likedSet.has(id)));
+  if(state.currentTrackId === id) refreshLikeUi();
+  toast(wasLiked?'Removed from Liked Songs':'Added to Liked Songs','success');
+}
+async function likeCurrentTrack(){
+  if(!state.currentTrackId || !state.currentTrackUri) return;
+  await toggleLike(state.currentTrackUri, document.getElementById('btn-like'));
+}
+function refreshLikeUi(){
+  const id = state.currentTrackId;
+  const row = document.getElementById('np-secondary-row');
+  if(!id){ if(row) row.style.display='none'; return; }
+  if(row) row.style.display='flex';
+  const btn = document.getElementById('btn-like');
+  const label = document.getElementById('btn-like-label');
+  const liked = likedSet.has(id);
+  btn?.classList.toggle('liked', liked);
+  if(label) label.textContent = liked ? 'liked' : 'like';
+}
+
+// ════ QUEUE A TRACK ════
+async function addToQueue(trackUri, ev){
+  if(ev) ev.stopPropagation();
+  const path = '/me/player/queue?uri=' + encodeURIComponent(trackUri) + (state.activeDeviceId?'&device_id='+state.activeDeviceId:'');
+  const r = await api(path, 'POST');
+  if(r !== null) toast('Added to queue','success');
+}
+
+// ════ DETAIL VIEW (playlist / album / artist drill-down) ════
+async function openDetail(type, id, name, uri){
+  state.detail = {type, id, name: (name||'').replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>'), uri, tracks: [], saved: false};
+  state.prevView = document.querySelector('.view.active')?.id?.replace('view-','') || 'now-playing';
+  switchView('detail');
+  document.getElementById('detail-title').textContent = state.detail.name;
+  document.getElementById('detail-subtitle').textContent = type;
+  document.getElementById('detail-list').innerHTML = '<div class="empty"><span class="spinner"></span>loading…</div>';
+  const saveBtn = document.getElementById('detail-save');
+  if(type === 'album'){ saveBtn.style.display='inline-flex'; await loadAlbumDetail(id); }
+  else if(type === 'playlist'){ saveBtn.style.display='none'; await loadPlaylistDetail(id); }
+  else if(type === 'artist'){ saveBtn.style.display='none'; await loadArtistDetail(id); }
+}
+function closeDetail(){
+  switchView(state.prevView || 'now-playing');
+  state.detail = null;
+}
+async function loadAlbumDetail(id){
+  const [album, tracks] = await Promise.all([api('/albums/'+id), api('/albums/'+id+'/tracks?limit=50&market=from_token')]);
+  if(!album){document.getElementById('detail-list').innerHTML='<div class="empty">album unavailable</div>';return;}
+  state.detail.uri = album.uri;
+  state.detail.tracks = tracks?.items || [];
+  document.getElementById('detail-title').textContent = album.name;
+  document.getElementById('detail-subtitle').textContent = album.artists.map(a=>a.name).join(', ') + ' · ' + (album.release_date?.slice(0,4)||'') + ' · ' + album.total_tracks + ' tracks';
+  // Check saved status
+  const cont = await api('/me/albums/contains?ids='+id);
+  state.detail.saved = Array.isArray(cont) && cont[0];
+  if(state.detail.saved) savedAlbumSet.add(id); else savedAlbumSet.delete(id);
+  updateDetailSaveBtn();
+  // Tracks here lack the .album field; inject for nicer rendering and like checks
+  const ids = state.detail.tracks.map(t=>t.id).filter(Boolean);
+  await checkLikedStatus(ids);
+  const html = state.detail.tracks.map((t,i)=>renderTrackItem({...t, album:{name:album.name}}, i, album.uri)).join('');
+  document.getElementById('detail-list').innerHTML = html || '<div class="empty">no tracks</div>';
+}
+async function loadPlaylistDetail(id){
+  const [pl, tracks] = await Promise.all([api('/playlists/'+id+'?fields=name,owner.display_name,tracks.total,uri'), api('/playlists/'+id+'/tracks?limit=50&market=from_token&fields=items(track(id,uri,name,duration_ms,explicit,artists(name),album(name)))')]);
+  if(!pl){document.getElementById('detail-list').innerHTML='<div class="empty">playlist unavailable</div>';return;}
+  state.detail.uri = pl.uri;
+  const items = (tracks?.items||[]).map(it=>it.track).filter(Boolean);
+  state.detail.tracks = items;
+  document.getElementById('detail-title').textContent = pl.name;
+  document.getElementById('detail-subtitle').textContent = (pl.owner?.display_name?'by '+pl.owner.display_name+' · ':'') + (pl.tracks?.total||items.length) + ' tracks';
+  const ids = items.map(t=>t?.id).filter(Boolean);
+  await checkLikedStatus(ids);
+  const html = items.map((t,i)=>renderTrackItem(t, i, pl.uri)).join('');
+  document.getElementById('detail-list').innerHTML = html || '<div class="empty">no tracks</div>';
+}
+async function loadArtistDetail(id){
+  const [artist, top] = await Promise.all([api('/artists/'+id), api('/artists/'+id+'/top-tracks?market=from_token')]);
+  if(!artist){document.getElementById('detail-list').innerHTML='<div class="empty">artist unavailable</div>';return;}
+  state.detail.uri = artist.uri;
+  state.detail.tracks = top?.tracks || [];
+  document.getElementById('detail-title').textContent = artist.name;
+  const sub = (artist.genres||[]).slice(0,3).join(' · ') || 'Artist';
+  const followers = artist.followers?.total ? ' · '+artist.followers.total.toLocaleString()+' followers' : '';
+  document.getElementById('detail-subtitle').textContent = sub + followers + ' · top tracks';
+  const ids = state.detail.tracks.map(t=>t.id).filter(Boolean);
+  await checkLikedStatus(ids);
+  // Artists have no useful context_uri for offset-play — use plain URIs list
+  const html = state.detail.tracks.map((t,i)=>renderTrackItem(t, i, null)).join('');
+  document.getElementById('detail-list').innerHTML = html || '<div class="empty">no top tracks</div>';
+}
+async function detailPlayAll(){
+  if(!state.detail) return;
+  if(state.detail.type === 'artist'){
+    const uris = state.detail.tracks.map(t=>t.uri).filter(Boolean);
+    if(!uris.length) return;
+    await playUris(uris);
+  } else {
+    // album / playlist — start at track 0 in context
+    const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');
+    activateSdkAudio();
+    await api(path,'PUT',{context_uri: state.detail.uri});
+    setTimeout(fetchState,1000);switchView('now-playing');
+  }
+}
+async function detailToggleSave(){
+  if(!state.detail || state.detail.type !== 'album') return;
+  const id = state.detail.id;
+  const wasSaved = savedAlbumSet.has(id);
+  if(wasSaved) savedAlbumSet.delete(id); else savedAlbumSet.add(id);
+  state.detail.saved = !wasSaved;
+  updateDetailSaveBtn();
+  const r = await api('/me/albums?ids='+id, wasSaved?'DELETE':'PUT');
+  if(r === null){ // revert
+    if(wasSaved) savedAlbumSet.add(id); else savedAlbumSet.delete(id);
+    state.detail.saved = wasSaved;
+    updateDetailSaveBtn();
+    return;
+  }
+  toast(wasSaved?'Album removed from Library':'Album saved to Library','success');
+}
+function updateDetailSaveBtn(){
+  const btn = document.getElementById('detail-save');
+  const label = document.getElementById('detail-save-label');
+  if(!btn || !state.detail) return;
+  const saved = state.detail.saved;
+  btn.classList.toggle('liked', !!saved);
+  if(label) label.textContent = saved ? 'Saved' : 'Save';
+}
 
 async function loadLibrary(){
   const list = document.getElementById('library-list');

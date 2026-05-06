@@ -120,11 +120,12 @@ Once activated in a session, `state.sdkActivated` is set to true and further cal
 
 | Quirk | Resolution |
 |---|---|
-| `limit=30` on `/search` returns 400 "Invalid limit" for new Dev Mode apps | Drop the param; Spotify defaults to 20 |
+| Dev Mode `/search` rejects `limit > 10` with 400 "Invalid limit"; with no `limit`, default is 5 (not 20 as historically) | Send `limit=10` — the maximum dev-mode allows, double the default |
 | `PUT /me/player` (transfer) returns 500 for fresh SDK devices | Skip transfer; use `?device_id=` query param on play |
 | Spotify Username ≠ API user ID | Use the random string from `/me` response |
 | Web Playback SDK silent on iOS without `activateElement()` | Call it inside any user click handler |
 | `/me/player` returns 204 (not 404) when no playback active | Treat as idle, not error |
+| `/me/player` returns `progress_ms: 0` for tracks playing on Web Playback SDK devices | When active device is the cleanplay SDK, read position from `webPlayer.getCurrentState().position` instead |
 
 ---
 
