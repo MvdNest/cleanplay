@@ -158,6 +158,13 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .np-context .ctx-link{color:var(--text-soft);cursor:pointer;border-bottom:1px dotted var(--muted-dim);transition:color 0.2s;padding-bottom:1px}
 .np-context .ctx-link:hover{color:var(--accent);border-bottom-color:var(--accent)}
 .np-context .ctx-pos{color:var(--muted-dim);margin-left:6px}
+.ctx-save-btn{background:none;border:none;color:var(--muted);padding:2px 6px;margin:0 2px;border-radius:4px;cursor:pointer;vertical-align:middle;display:none;align-items:center;transition:all 0.15s}
+.ctx-save-btn svg{width:13px;height:13px;display:block}
+.ctx-save-btn svg path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+.ctx-save-btn.liked svg path{fill:currentColor;stroke:none}
+.ctx-save-btn.liked{color:var(--accent)}
+.ctx-save-btn:hover{color:var(--accent);background:var(--surface-2)}
+.ctx-save-btn.show{display:inline-flex}
 .np-secondary-row{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border-soft)}
 .np-secondary-row .icon-btn{padding:6px 8px}
 .np-secondary-row .icon-btn svg{width:18px;height:18px}
@@ -331,7 +338,7 @@ body.no-library .heart-btn,body.no-library .np-secondary-row{display:none !impor
             <div class="np-track" id="np-track">—</div>
             <div class="np-artist" id="np-artist">—</div>
             <div class="np-album" id="np-album">—</div>
-            <div class="np-context" id="np-context" style="display:none">from <span class="ctx-link" id="np-context-link"></span><span class="ctx-pos" id="np-context-pos"></span></div>
+            <div class="np-context" id="np-context" style="display:none">from <span class="ctx-link" id="np-context-link"></span><button class="ctx-save-btn" id="np-ctx-save" onclick="toggleContextSave()" title="Save"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></button><span class="ctx-pos" id="np-context-pos"></span></div>
             <div class="np-secondary-row" id="np-secondary-row" style="display:none">
               <button class="icon-btn heart-btn" id="btn-like" onclick="likeCurrentTrack()" title="Like / unlike (Spotify saved)"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></button>
               <span class="icon-label" id="btn-like-label">like</span>
@@ -688,6 +695,67 @@ async function updateContextLine(ctx, currentTrack){
   }
   if(posEl) posEl.textContent = posLabel;
   if(el) el.style.display = 'block';
+  // Refresh the one-tap save button. For playlists we need followedPlaylistSet to be fresh.
+  if(state.currentContextType === 'playlist') ensureFollowedPlaylists().then(updateContextSaveBtn);
+  else updateContextSaveBtn();
+}
+
+function updateContextSaveBtn(){
+  const btn = document.getElementById('np-ctx-save');
+  if(!btn) return;
+  const type = state.currentContextType;
+  const uri = state.currentContextUri;
+  if(!type || !uri || type === 'artist'){ btn.classList.remove('show','liked'); return; }
+  const id = uri.split(':').pop();
+  if(type === 'playlist'){
+    btn.classList.add('show');
+    const liked = followedPlaylistSet.has(id);
+    btn.classList.toggle('liked', liked);
+    btn.title = liked ? 'Remove playlist from your library' : 'Save playlist to your library';
+  } else if(type === 'album'){
+    if(state.libraryWritable === false){
+      // Spotify dev mode blocks /me/albums; hide the affordance entirely
+      btn.classList.remove('show','liked');
+      return;
+    }
+    btn.classList.add('show');
+    const saved = savedAlbumSet.has(id);
+    btn.classList.toggle('liked', saved);
+    btn.title = saved ? 'Remove album from your library' : 'Save album to your library';
+  } else {
+    btn.classList.remove('show','liked');
+  }
+}
+
+async function toggleContextSave(){
+  const type = state.currentContextType;
+  const uri = state.currentContextUri;
+  if(!uri || !type) return;
+  const id = uri.split(':').pop();
+  if(type === 'playlist'){
+    const wasFollowed = followedPlaylistSet.has(id);
+    if(wasFollowed) followedPlaylistSet.delete(id); else followedPlaylistSet.add(id);
+    updateContextSaveBtn();
+    const r = await api('/playlists/'+id+'/followers', wasFollowed?'DELETE':'PUT', wasFollowed?null:{public:false});
+    if(r === null){
+      if(wasFollowed) followedPlaylistSet.add(id); else followedPlaylistSet.delete(id);
+      updateContextSaveBtn();
+      return;
+    }
+    _followedLoadedAt = 0; // invalidate cache so the next ensureFollowedPlaylists / Library load is fresh
+    toast(wasFollowed?'Playlist removed from Library':'Playlist saved to Library','success');
+  } else if(type === 'album'){
+    const wasSaved = savedAlbumSet.has(id);
+    if(wasSaved) savedAlbumSet.delete(id); else savedAlbumSet.add(id);
+    updateContextSaveBtn();
+    const r = await api('/me/albums?ids='+id, wasSaved?'DELETE':'PUT');
+    if(r === null){
+      if(wasSaved) savedAlbumSet.add(id); else savedAlbumSet.delete(id);
+      updateContextSaveBtn();
+      return;
+    }
+    toast(wasSaved?'Album removed from Library':'Album saved to Library','success');
+  }
 }
 
 function updateNowPlaying(data){
