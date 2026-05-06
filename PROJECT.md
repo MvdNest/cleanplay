@@ -134,6 +134,7 @@ Once activated in a session, `state.sdkActivated` is set to true and further cal
 | `/me/tracks` and `/me/albums` (both reads `/contains` and writes `PUT/DELETE`) all return **403 Forbidden** in dev mode regardless of scope. Even with `user-library-modify` granted, every call is blocked. | Probe `/me/tracks/contains` once at app startup; if 403, set `body.no-library` and hide all heart buttons + the album save button. Like/save features simply do not work without Extended Quota approval from Spotify. |
 | Playlist follow/unfollow (`PUT/DELETE /playlists/{id}/followers`) **works** in dev mode with `playlist-modify-public` + `playlist-modify-private` scopes — but the corresponding `GET /playlists/{id}/followers/contains` is **403** | Maintain a local `followedPlaylistSet` populated from `/me/playlists` (which works) instead of calling `/contains`. Invalidate the cache on every save toggle |
 | Playlist creation (`POST /users/{id}/playlists`) is **403** in dev mode regardless of scope | Don't expose a "create playlist" UI; users have to create playlists in Spotify proper |
+| Artist follow (`PUT/DELETE /me/following?type=artist`) and the matching `/me/following/contains` are all **403** in dev mode, even with `user-follow-modify` granted. Reading the list (`GET /me/following?type=artist`) does work | Don't expose a follow-artist button; would just fail. Scopes are kept in case Extended Quota is granted later |
 
 ---
 
