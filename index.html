@@ -499,7 +499,9 @@ async function startAuth(){
   const verifier = genRandomString(64);
   const challenge = await pkceChallenge(verifier);
   localStorage.setItem(KEYS.codeVerifier, verifier);
-  const params = new URLSearchParams({response_type:'code',client_id:clientId,scope:SCOPES,redirect_uri:REDIRECT_URI,code_challenge_method:'S256',code_challenge:challenge});
+  // show_dialog=true forces the Spotify consent screen every time. Important when
+  // scopes change — without it, Spotify silently re-authorizes with the old scope set.
+  const params = new URLSearchParams({response_type:'code',client_id:clientId,scope:SCOPES,redirect_uri:REDIRECT_URI,code_challenge_method:'S256',code_challenge:challenge,show_dialog:'true'});
   window.location='https://accounts.spotify.com/authorize?'+params.toString();
 }
 
