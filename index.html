@@ -169,6 +169,20 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .lyrics-plain{font-family:var(--serif);font-size:16px;color:var(--text-soft);white-space:pre-wrap;line-height:1.7}
 .lyrics-status{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;padding:8px 0}
 .lyrics-credit{font-family:var(--mono);font-size:9px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:1.5px;margin-top:14px;padding-top:10px;border-top:1px solid var(--border-soft);text-align:right}
+.up-next-section{padding:16px 24px;border-top:1px solid var(--border-soft)}
+.up-next-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.up-next-title{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:3px}
+.up-next-link{font-family:var(--mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;cursor:pointer;border:none;background:none;padding:0}
+.up-next-link:hover{color:var(--accent-bright)}
+.up-next-row{display:flex;align-items:center;gap:12px;padding:8px 0;cursor:pointer;border-bottom:1px solid var(--border-soft);transition:background 0.15s}
+.up-next-row:hover{background:var(--surface)}
+.up-next-row:last-child{border-bottom:none}
+.up-next-num{font-family:var(--mono);font-size:10px;color:var(--muted-dim);width:18px;text-align:right;flex-shrink:0}
+.up-next-info{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up-next-info .up-next-track{color:var(--text);font-weight:500}
+.up-next-info .up-next-artist{color:var(--muted);margin-left:6px}
+.up-next-row.user-queued .up-next-track{color:var(--accent)}
+.up-next-dur{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
 .ctx-save-btn{background:none;border:none;color:var(--muted);padding:2px 6px;margin:0 2px;border-radius:4px;cursor:pointer;vertical-align:middle;display:none;align-items:center;transition:all 0.15s}
 .ctx-save-btn svg{width:13px;height:13px;display:block}
 .ctx-save-btn svg path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
@@ -367,6 +381,13 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
         <div class="device-bar">
           <span id="device-info">— no device —</span>
           <span style="display:flex;gap:8px"><button onclick="playHere()" title="Play in this browser (Premium)">▶ Here</button><button onclick="openModal('devices')">Switch device →</button></span>
+        </div>
+        <div class="up-next-section" id="up-next-section" style="display:none">
+          <div class="up-next-header">
+            <span class="up-next-title">Coming up</span>
+            <button class="up-next-link" onclick="switchView('queue')">View queue →</button>
+          </div>
+          <div id="up-next-list"></div>
         </div>
       </section>
       <section class="view" id="view-search">
@@ -654,6 +675,7 @@ async function fetchState(){
   await updateContextLine(data.context, data.item);
   updateNowPlaying(data);updateControls();updateMediaSession(data);
   loadLyricsForCurrentTrack();
+  refreshUpNext();
 }
 
 async function updateContextLine(ctx, currentTrack){
@@ -1180,6 +1202,7 @@ function switchView(name){
   document.querySelector('.tab[data-view="'+name+'"]')?.classList.add('active');
   if(name==='library')loadLibrary();
   if(name==='queue')loadQueue();
+  if(name==='now-playing')refreshUpNext();
 }
 
 function openModal(name){document.getElementById('modal-'+name)?.classList.add('active');if(name==='devices')loadDevices();}
@@ -1250,6 +1273,38 @@ function setupMediaSession(){
     updateProgress();
     api('/me/player/seek?position_ms='+ms+devQS(true), 'PUT');
   }));
+}
+
+// ════ COMING-UP PREVIEW ON NOW PLAYING ════
+// Shows the next ~4 upcoming tracks under the device bar without leaving Now Playing.
+// Reuses /me/player/queue with the same dedupe + user-queued badge as the Queue view.
+async function refreshUpNext(){
+  const sec = document.getElementById('up-next-section');
+  if(!sec) return;
+  const onNP = document.getElementById('view-now-playing')?.classList.contains('active');
+  if(!onNP || !state.currentTrackId){ sec.style.display = 'none'; return; }
+  const data = await api('/me/player/queue', 'GET', null, {silent:true});
+  if(!data || !Array.isArray(data.queue) || !data.queue.length){ sec.style.display = 'none'; return; }
+  // Collapse Spotify's consecutive same-URI repeats (the SDK reporting quirk)
+  const deduped = [];
+  let lastUri = null;
+  for(const t of data.queue){
+    if(t?.uri && t.uri === lastUri) continue;
+    deduped.push(t);
+    lastUri = t?.uri;
+  }
+  if(!deduped.length){ sec.style.display = 'none'; return; }
+  const userQueued = getRecentQueuedUris();
+  const top = deduped.slice(0, 4);
+  document.getElementById('up-next-list').innerHTML = top.map((t,i) => {
+    const cls = 'up-next-row' + (t?.uri && userQueued.has(t.uri) ? ' user-queued' : '');
+    const title = escapeHtml(t.name||'');
+    const artist = escapeHtml((t.artists||[]).map(a=>a.name).join(', '));
+    const dur = formatTime(t.duration_ms);
+    const onclick = t?.uri ? `playUri('${t.uri}',null)` : '';
+    return `<div class="${cls}" onclick="${onclick}"><div class="up-next-num">${String(i+1).padStart(2,'0')}</div><div class="up-next-info"><span class="up-next-track">${title}</span><span class="up-next-artist">· ${artist}</span></div><div class="up-next-dur">${dur}</div></div>`;
+  }).join('');
+  sec.style.display = 'block';
 }
 
 // ════ LYRICS (via LRCLIB — free, no key, CORS-enabled) ════
