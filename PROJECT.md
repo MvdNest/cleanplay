@@ -62,6 +62,7 @@ user-modify-playback-state
 user-read-currently-playing
 user-read-recently-played
 user-library-read
+user-library-modify        ← needed for ♥ like/unlike + album save
 playlist-read-private
 playlist-read-collaborative
 user-read-email
