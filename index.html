@@ -158,6 +158,16 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .np-context .ctx-link{color:var(--text-soft);cursor:pointer;border-bottom:1px dotted var(--muted-dim);transition:color 0.2s;padding-bottom:1px}
 .np-context .ctx-link:hover{color:var(--accent);border-bottom-color:var(--accent)}
 .np-context .ctx-pos{color:var(--muted-dim);margin-left:6px}
+.lyrics-section{margin-top:18px;padding-top:14px;border-top:1px dashed var(--border-soft)}
+.lyrics-toggle{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:4px 0;cursor:pointer;transition:color 0.15s}
+.lyrics-toggle:hover{color:var(--accent)}
+.lyrics-content{margin-top:14px;max-height:380px;overflow-y:auto;padding:4px 0;scroll-behavior:smooth}
+.lyrics-line{font-family:var(--serif);font-size:18px;color:var(--muted);padding:5px 0;line-height:1.4;transition:color 0.3s}
+.lyrics-line.active{color:var(--accent);font-weight:500}
+.lyrics-line.past{color:var(--muted-dim)}
+.lyrics-plain{font-family:var(--serif);font-size:16px;color:var(--text-soft);white-space:pre-wrap;line-height:1.7}
+.lyrics-status{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;padding:8px 0}
+.lyrics-credit{font-family:var(--mono);font-size:9px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:1.5px;margin-top:14px;padding-top:10px;border-top:1px solid var(--border-soft);text-align:right}
 .ctx-save-btn{background:none;border:none;color:var(--muted);padding:2px 6px;margin:0 2px;border-radius:4px;cursor:pointer;vertical-align:middle;display:none;align-items:center;transition:all 0.15s}
 .ctx-save-btn svg{width:13px;height:13px;display:block}
 .ctx-save-btn svg path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
@@ -331,6 +341,10 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
             <div class="np-artist" id="np-artist">—</div>
             <div class="np-album" id="np-album">—</div>
             <div class="np-context" id="np-context" style="display:none">from <span class="ctx-link" id="np-context-link"></span><button class="ctx-save-btn" id="np-ctx-save" onclick="toggleContextSave()" title="Save"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></button><span class="ctx-pos" id="np-context-pos"></span></div>
+            <div class="lyrics-section" id="lyrics-section" style="display:none">
+              <button class="lyrics-toggle" id="lyrics-toggle" onclick="toggleLyrics()">▼ Lyrics</button>
+              <div class="lyrics-content" id="lyrics-content" style="display:none"></div>
+            </div>
           </div>
         </div>
         <div class="progress-area">
@@ -458,6 +472,10 @@ const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id
 let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false,currentTrackId:null,currentTrackUri:null,currentContextUri:null,currentContextType:null,currentContextName:null,currentContextOwner:null,currentContextTracks:null,detail:null,prevView:'now-playing'};
 const followedPlaylistSet = new Set(); // playlist IDs in /me/playlists (owned or followed)
 const contextNameCache = new Map();   // uri -> {name, owner, tracks?}
+const lyricsCache = new Map();        // trackId -> {found, plain, syncedLines, instrumental}
+let lyricsOpen = false;
+let lyricsCurrentTrackId = null;
+let lyricsActiveLineIdx = -1;
 
 async function sha256Hex(text){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 
@@ -617,8 +635,10 @@ async function fetchState(){
   // Track and context tracking
   state.currentTrackId = data.item.id;
   state.currentTrackUri = data.item.uri;
+  state.currentTrack = data.item;  // keep full track so the lyrics lookup has artist/album/duration
   await updateContextLine(data.context, data.item);
   updateNowPlaying(data);updateControls();updateMediaSession(data);
+  loadLyricsForCurrentTrack();
 }
 
 async function updateContextLine(ctx, currentTrack){
@@ -745,8 +765,10 @@ function showIdle(){
   document.getElementById('np-info').style.display='none';
   document.getElementById('status-dot').classList.remove('live');
   document.getElementById('device-info').textContent='— no device active —';
-  state.currentTrackId = null; state.currentTrackUri = null;
+  state.currentTrackId = null; state.currentTrackUri = null; state.currentTrack = null;
   state.currentContextUri = null; state.currentContextName = null; state.currentContextTracks = null;
+  document.getElementById('lyrics-section').style.display='none';
+  lyricsCurrentTrackId = null;
   if('mediaSession' in navigator){ navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
 }
 
@@ -778,6 +800,7 @@ function startProgressTick(){
       state.localProgress += 1000;
       if(state.localProgress > state.localDuration)state.localProgress = state.localDuration;
       updateProgress();
+      updateLyricsHighlight();   // synced-lyrics line follows playback
     }
     // Sleep-timer expiry runs every tick regardless of playback state — otherwise a paused
     // session would never trigger the auto-pause and the status label would stay stuck.
@@ -1030,10 +1053,20 @@ async function loadQueue(){
     html += `<div class="item playing"><div class="item-num">▸</div><div class="item-content"><div class="item-title">${escapeHtml(data.currently_playing.name)}</div><div class="item-subtitle">${escapeHtml(data.currently_playing.artists.map(a=>a.name).join(', '))}</div></div><div class="item-duration">${formatTime(data.currently_playing.duration_ms)}</div></div>`;
   }
   if(data.queue.length){
-    html += `<div class="list-section"><div class="list-section-title">Up next <span class="list-section-count">${data.queue.length}</span></div></div>`;
+    // Spotify quirk: GET /me/player/queue often reports the same URI 5-10× when playing a
+    // single-URI track on an SDK device. Collapse consecutive same-URI rows so the display
+    // reflects the actual upcoming variety, not the buggy reporting.
+    const deduped = [];
+    let lastUri = null;
+    for(const t of data.queue){
+      if(t?.uri && t.uri === lastUri) continue;
+      deduped.push(t);
+      lastUri = t?.uri;
+    }
+    html += `<div class="list-section"><div class="list-section-title">Up next <span class="list-section-count">${deduped.length}</span></div></div>`;
     // Wrap in arrow fn — Array.map passes (el,i,array); renderTrackItem's third param is contextUri,
     // and a leaked array there produced "[object Object],…" -> 400 Invalid context uri on click.
-    html += data.queue.slice(0,25).map((t,i)=>renderTrackItem(t,i)).join('');
+    html += deduped.slice(0,25).map((t,i)=>renderTrackItem(t,i)).join('');
   } else {
     html += '<div class="empty"><div class="empty-art">·</div>queue is empty</div>';
   }
@@ -1152,6 +1185,113 @@ function setupMediaSession(){
     updateProgress();
     api('/me/player/seek?position_ms='+ms+devQS(true), 'PUT');
   }));
+}
+
+// ════ LYRICS (via LRCLIB — free, no key, CORS-enabled) ════
+async function fetchLyrics(track){
+  const params = new URLSearchParams({
+    artist_name: (track.artists||[]).map(a=>a.name).join(', '),
+    track_name: track.name || '',
+    album_name: track.album?.name || '',
+    duration: String(Math.round((track.duration_ms||0) / 1000))
+  });
+  try{
+    const r = await fetch('https://lrclib.net/api/get?' + params.toString());
+    if(r.status === 404) return {found:false};
+    if(!r.ok) return {found:false, error:'API '+r.status};
+    const data = await r.json();
+    return {
+      found: true,
+      plain: data.plainLyrics || '',
+      syncedLines: data.syncedLyrics ? parseLrc(data.syncedLyrics) : null,
+      instrumental: !!data.instrumental
+    };
+  }catch(e){ return {found:false, error:e.message}; }
+}
+
+function parseLrc(lrcText){
+  return (lrcText||'').split('\n').map(line => {
+    // [mm:ss.xx] text  — accept 2 or 3 digit fractional seconds
+    const m = line.match(/^\[(\d+):(\d+)(?:\.(\d+))?\]\s*(.*)$/);
+    if(!m) return null;
+    const min = parseInt(m[1]), sec = parseInt(m[2]);
+    const frac = m[3] ? parseInt(m[3].padEnd(3,'0').slice(0,3)) : 0;
+    return {ms: (min*60 + sec)*1000 + frac, text: m[4] || ''};
+  }).filter(Boolean);
+}
+
+async function loadLyricsForCurrentTrack(){
+  const tid = state.currentTrackId;
+  const section = document.getElementById('lyrics-section');
+  if(!tid || !state.currentTrack){ section.style.display='none'; return; }
+  section.style.display='block';
+  if(tid === lyricsCurrentTrackId) return;  // already loaded for this track
+  lyricsCurrentTrackId = tid;
+  lyricsActiveLineIdx = -1;
+  let entry = lyricsCache.get(tid);
+  if(!entry){
+    if(lyricsOpen) document.getElementById('lyrics-content').innerHTML = '<div class="lyrics-status">looking up…</div>';
+    entry = await fetchLyrics(state.currentTrack);
+    lyricsCache.set(tid, entry);
+    if(tid !== lyricsCurrentTrackId) return;  // user changed tracks while we were fetching
+  }
+  if(lyricsOpen) renderLyrics(entry);
+}
+
+function renderLyrics(entry){
+  const c = document.getElementById('lyrics-content');
+  if(!entry || !entry.found){ c.innerHTML = '<div class="lyrics-status">no lyrics found for this track</div>'; return; }
+  if(entry.instrumental){ c.innerHTML = '<div class="lyrics-status">instrumental — no lyrics</div>'; return; }
+  let body = '';
+  if(entry.syncedLines && entry.syncedLines.length){
+    body = entry.syncedLines.map((l,i)=>'<div class="lyrics-line" data-i="'+i+'">'+escapeHtml(l.text||' ')+'</div>').join('');
+  } else if(entry.plain){
+    body = '<div class="lyrics-plain">'+escapeHtml(entry.plain)+'</div>';
+  } else {
+    body = '<div class="lyrics-status">no lyrics found for this track</div>';
+  }
+  body += '<div class="lyrics-credit">lyrics · lrclib.net</div>';
+  c.innerHTML = body;
+  lyricsActiveLineIdx = -1;
+}
+
+function toggleLyrics(){
+  lyricsOpen = !lyricsOpen;
+  const content = document.getElementById('lyrics-content');
+  const toggle = document.getElementById('lyrics-toggle');
+  content.style.display = lyricsOpen ? 'block' : 'none';
+  toggle.textContent = lyricsOpen ? '▲ Lyrics' : '▼ Lyrics';
+  if(lyricsOpen){
+    const entry = lyricsCache.get(lyricsCurrentTrackId);
+    if(entry) renderLyrics(entry);
+    else loadLyricsForCurrentTrack();
+    setTimeout(updateLyricsHighlight, 50);
+  }
+}
+
+function updateLyricsHighlight(){
+  if(!lyricsOpen) return;
+  const tid = state.currentTrackId;
+  const entry = lyricsCache.get(tid);
+  if(!entry || !entry.syncedLines || !entry.syncedLines.length) return;
+  const lines = entry.syncedLines;
+  const pos = state.localProgress || 0;
+  // find latest line where ms <= pos
+  let idx = -1;
+  for(let i=0;i<lines.length;i++){ if(lines[i].ms <= pos) idx = i; else break; }
+  if(idx === lyricsActiveLineIdx) return;
+  const all = document.querySelectorAll('.lyrics-line');
+  all.forEach((el,i)=>{ el.classList.toggle('active', i===idx); el.classList.toggle('past', i<idx); });
+  if(idx >= 0){
+    const el = document.querySelector('.lyrics-line[data-i="'+idx+'"]');
+    const container = document.getElementById('lyrics-content');
+    if(el && container){
+      // keep the active line ~1/3 from top of the visible panel
+      const target = el.offsetTop - container.clientHeight/3;
+      container.scrollTo({top: Math.max(0,target), behavior:'smooth'});
+    }
+  }
+  lyricsActiveLineIdx = idx;
 }
 
 function updateMediaSession(data){
