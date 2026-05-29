@@ -508,23 +508,23 @@ async function checkGate(){
   if(!stored){
     if(input.length<4){showGateError('Min. 4 characters');return;}
     localStorage.setItem(KEYS.gateHash, await sha256Hex(input));
-    sessionStorage.setItem(KEYS.gateOk,'1');
+    localStorage.setItem(KEYS.gateOk,'1');
     proceedFromGate();return;
   }
   const h = await sha256Hex(input);
-  if(h===stored){sessionStorage.setItem(KEYS.gateOk,'1');proceedFromGate();}
+  if(h===stored){localStorage.setItem(KEYS.gateOk,'1');proceedFromGate();}
   else{showGateError('Wrong code');document.getElementById('gate-input').value='';}
 }
 function showGateError(msg){const el=document.getElementById('gate-error');el.textContent=msg;setTimeout(()=>{el.textContent='';},2500);}
 function proceedFromGate(){document.getElementById('gate').style.display='none';decideNextScreen();}
 function maybeShowGate(){
   const stored = localStorage.getItem(KEYS.gateHash);
-  const unlocked = sessionStorage.getItem(KEYS.gateOk);
+  const unlocked = localStorage.getItem(KEYS.gateOk);
   if(!stored){document.getElementById('gate-prompt').textContent='set your access code';document.getElementById('gate-input').placeholder='min 4 chars';return true;}
   if(unlocked){document.getElementById('gate').style.display='none';return false;}
   return true;
 }
-function resetGate(){if(!confirm("Reset your access code? You'll set a new one next time."))return;localStorage.removeItem(KEYS.gateHash);sessionStorage.removeItem(KEYS.gateOk);toast('Access code reset','success');}
+function resetGate(){if(!confirm("Reset your access code? You'll set a new one next time."))return;localStorage.removeItem(KEYS.gateHash);localStorage.removeItem(KEYS.gateOk);toast('Access code reset','success');}
 
 function genRandomString(len){const arr=new Uint8Array(len);crypto.getRandomValues(arr);return Array.from(arr).map(b=>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[b%62]).join('');}
 async function pkceChallenge(verifier){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');}
@@ -591,7 +591,21 @@ async function refreshTokenFn(){
   }catch{return false;}
 }
 
-async function ensureToken(){if(Date.now()>=state.tokenExpires){const ok=await refreshTokenFn();if(!ok){signOut();return false;}}return true;}
+async function ensureToken(){
+  if(Date.now() < state.tokenExpires) return true;
+  // Deduplicate concurrent refresh calls — all waiters share the same in-flight promise
+  if(state._refreshPromise) return state._refreshPromise;
+  state._refreshPromise = (async () => {
+    try{
+      const ok = await refreshTokenFn();
+      if(!ok){signOut();return false;}
+      return true;
+    }finally{
+      state._refreshPromise = null;
+    }
+  })();
+  return state._refreshPromise;
+}
 
 async function verifyUser(){
   const me = await api('/me');
@@ -897,7 +911,10 @@ function startProgressTick(){
 // Build the query suffix once so every control call is consistent.
 function devQS(initial){
   const sep = initial ? '&' : '?';
-  return state.activeDeviceId ? sep+'device_id='+state.activeDeviceId : '';
+  if(!state.activeDeviceId) return '';
+  // Don't send a stale SDK device_id if the SDK has disconnected — let Spotify fall back
+  if(state.activeDeviceId === state.cleanplayDeviceId && !state.sdkReady) return '';
+  return sep+'device_id='+state.activeDeviceId;
 }
 async function togglePlay(){
   activateSdkAudio();
@@ -950,18 +967,18 @@ function renderAlbumItem(a,i){return `<div class="item" onclick="openDetail('alb
 function renderPlaylistItem(p,i){return `<div class="item" onclick="openDetail('playlist','${p.id}','${escapeAttr(p.name)}','${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${p.tracks?.total||0} tracks</div></div></div>`;}
 function escapeAttr(s){return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-async function playUri(trackUri,contextUri){activateSdkAudio();const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
-async function playArtist(artistUri){activateSdkAudio();const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');await api(path,'PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
+async function playUri(trackUri,contextUri){activateSdkAudio();const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};const path='/me/player/play'+devQS(false);await api(path,'PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
+async function playArtist(artistUri){activateSdkAudio();const path='/me/player/play'+devQS(false);await api(path,'PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
 async function playUriInContext(trackUri,contextUri){
   activateSdkAudio();
-  const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');
+  const path='/me/player/play'+devQS(false);
   await api(path,'PUT',{context_uri:contextUri,offset:{uri:trackUri}});
   setTimeout(fetchState,1000);switchView('now-playing');
 }
 async function playUris(uris){
   // play a list of track URIs (used for artist top-tracks where we have no context)
   activateSdkAudio();
-  const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');
+  const path='/me/player/play'+devQS(false);
   await api(path,'PUT',{uris});
   setTimeout(fetchState,1000);switchView('now-playing');
 }
@@ -1106,7 +1123,7 @@ async function detailPlayAll(){
     else await playArtist(state.detail.uri);   // fallback when top-tracks endpoint is restricted
   } else {
     // album / playlist — start at track 0 in context
-    const path='/me/player/play'+(state.activeDeviceId?'?device_id='+state.activeDeviceId:'');
+    const path='/me/player/play'+devQS(false);
     activateSdkAudio();
     await api(path,'PUT',{context_uri: state.detail.uri});
     setTimeout(fetchState,1000);switchView('now-playing');
@@ -1277,6 +1294,7 @@ function showApp(){
   document.getElementById('settings-account').textContent = state.user?.email ? state.user.email+' ('+state.user.product+')' : state.user?.id || '';
   fetchState();
   startProgressTick();
+  clearInterval(state.pollTimer);
   state.pollTimer = setInterval(fetchState, 5000);
   initWebPlayer();
   setupMediaSession();
@@ -1529,7 +1547,12 @@ function createWebPlayer(){
     // Spotify's signature for "track just ended without auto-advance":
     //   paused === true, position === 0, and previous_tracks[0] is the URI we were playing.
     player.addListener('player_state_changed', (s) => {
-      if(!s) return;
+      if(!s){
+        // SDK disconnected — happens on iOS screen lock / background suspend
+        state.sdkReady = false;
+        state.sdkActivated = false;
+        return;
+      }
       const curUri = s.track_window?.current_track?.uri;
       const prevTrackUri = s.track_window?.previous_tracks?.[0]?.uri;
       const ended = s.paused && s.position === 0 && prevTrackUri && prevTrackUri === state._lastSdkPlayingUri;
@@ -1622,6 +1645,36 @@ async function decideNextScreen(){
   }
   showSetup();
 }
+
+document.addEventListener('visibilitychange', async () => {
+  if(document.visibilityState !== 'visible') return;
+  // App came back to foreground after screen wake / app-switch
+
+  // 1. Check if the SDK device is still alive
+  if(state.webPlayer && state.sdkReady){
+    try{
+      const sdkState = await state.webPlayer.getCurrentState();
+      if(!sdkState){
+        // SDK device was silently disconnected while backgrounded
+        state.sdkReady = false;
+        state.sdkActivated = false;
+        if(state.activeDeviceId === state.cleanplayDeviceId){
+          state.activeDeviceId = null;
+        }
+        // Gentle status (not an error toast) — SDK will re-register and fire 'ready'
+        const devEl = document.getElementById('device-info');
+        if(devEl) devEl.textContent = '↻ Reconnecting…';
+      }
+    }catch{}
+  }
+
+  // 2. Immediately refresh now-playing instead of waiting up to 5s for the poll tick
+  if(state.accessToken && document.getElementById('app')?.classList.contains('active')){
+    clearInterval(state.pollTimer);
+    fetchState();
+    state.pollTimer = setInterval(fetchState, 5000);
+  }
+});
 
 window.addEventListener('load',()=>{
   const needsGate = maybeShowGate();
