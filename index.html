@@ -28,13 +28,7 @@ input,textarea{font-family:inherit}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:var(--muted-dim)}
-.gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center}
-.gate-logo{font-family:var(--serif);font-style:italic;font-size:64px;color:var(--accent);font-weight:500;margin-bottom:4px;letter-spacing:-2px}
-.gate-tag{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:4px;margin-bottom:56px}
-.gate-lock{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:3px;margin-bottom:16px}
-.gate input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:16px 20px;font-family:var(--mono);font-size:14px;border-radius:8px;width:280px;max-width:100%;outline:none;text-align:center;letter-spacing:4px;transition:border-color 0.2s}
-.gate input:focus{border-color:var(--accent)}
-.gate-error{color:var(--danger);font-family:var(--mono);font-size:12px;margin-top:16px;height:18px;letter-spacing:1px}
+
 .setup-wrap{max-width:640px;margin:0 auto;padding:48px 24px 80px}
 .setup-header{text-align:center;margin-bottom:56px;padding-bottom:40px;border-bottom:1px solid var(--border-soft)}
 .setup-brand{font-family:var(--serif);font-style:italic;font-size:56px;color:var(--accent);letter-spacing:-2px;font-weight:500;line-height:1;margin-bottom:12px}
@@ -259,13 +253,6 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 </style>
 </head>
 <body>
-<div class="gate" id="gate">
-  <div class="gate-logo">CleanPlay</div>
-  <div class="gate-tag">private · text only</div>
-  <div class="gate-lock" id="gate-prompt">enter access code</div>
-  <input type="password" id="gate-input" autocomplete="off" maxlength="32" onkeydown="if(event.key==='Enter')checkGate()" placeholder="• • • • • •">
-  <div class="gate-error" id="gate-error"></div>
-</div>
 
 <div class="setup-wrap" id="setup" style="display:none">
   <div class="setup-header">
@@ -445,10 +432,6 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
             <button class="btn-ghost" onclick="signOut()">Sign out</button>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">Reset access code</div><div class="settings-detail">Forget the local password gate</div></div>
-            <button class="btn-ghost" onclick="resetGate()">Reset</button>
-          </div>
-          <div class="settings-row">
             <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay · v2 · text only · no images, ever</div></div>
           </div>
         </div>
@@ -490,7 +473,7 @@ const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 // Liking tracks, saving albums, and following artists are blocked by Spotify dev-mode policy
 // regardless of scope — those scopes have been removed since the corresponding UI was retired.
 const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','playlist-modify-private','user-read-email','user-read-private','streaming'].join(' ');
-const KEYS = {gateOk:'cp_gate_ok',gateHash:'cp_gate_hash',clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier',recentQueued:'cp_recent_queued'};
+const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier',recentQueued:'cp_recent_queued'};
 let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false,currentTrackId:null,currentTrackUri:null,currentContextUri:null,currentContextType:null,currentContextName:null,currentContextOwner:null,currentContextTracks:null,detail:null,prevView:'now-playing'};
 const followedPlaylistSet = new Set(); // playlist IDs in /me/playlists (owned or followed)
 const contextNameCache = new Map();   // uri -> {name, owner, tracks?}
@@ -499,32 +482,6 @@ let lyricsOpen = false;
 let lyricsCurrentTrackId = null;
 let lyricsActiveLineIdx = -1;
 
-async function sha256Hex(text){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
-
-async function checkGate(){
-  const input = document.getElementById('gate-input').value;
-  if(!input)return;
-  const stored = localStorage.getItem(KEYS.gateHash);
-  if(!stored){
-    if(input.length<4){showGateError('Min. 4 characters');return;}
-    localStorage.setItem(KEYS.gateHash, await sha256Hex(input));
-    localStorage.setItem(KEYS.gateOk,'1');
-    proceedFromGate();return;
-  }
-  const h = await sha256Hex(input);
-  if(h===stored){localStorage.setItem(KEYS.gateOk,'1');proceedFromGate();}
-  else{showGateError('Wrong code');document.getElementById('gate-input').value='';}
-}
-function showGateError(msg){const el=document.getElementById('gate-error');el.textContent=msg;setTimeout(()=>{el.textContent='';},2500);}
-function proceedFromGate(){document.getElementById('gate').style.display='none';decideNextScreen();}
-function maybeShowGate(){
-  const stored = localStorage.getItem(KEYS.gateHash);
-  const unlocked = localStorage.getItem(KEYS.gateOk);
-  if(!stored){document.getElementById('gate-prompt').textContent='set your access code';document.getElementById('gate-input').placeholder='min 4 chars';return true;}
-  if(unlocked){document.getElementById('gate').style.display='none';return false;}
-  return true;
-}
-function resetGate(){if(!confirm("Reset your access code? You'll set a new one next time."))return;localStorage.removeItem(KEYS.gateHash);localStorage.removeItem(KEYS.gateOk);toast('Access code reset','success');}
 
 function genRandomString(len){const arr=new Uint8Array(len);crypto.getRandomValues(arr);return Array.from(arr).map(b=>'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[b%62]).join('');}
 async function pkceChallenge(verifier){const buf = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');}
@@ -548,11 +505,11 @@ async function handleAuthCallback(){
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const err = params.get('error');
-  if(err){document.getElementById('gate').style.display='none';document.getElementById('setup').style.display='block';setAuthStatus('Spotify error: '+err,'error');window.history.replaceState(null,null,REDIRECT_URI);return false;}
+  if(err){document.getElementById('setup').style.display='block';setAuthStatus('Spotify error: '+err,'error');window.history.replaceState(null,null,REDIRECT_URI);return false;}
   if(!code)return false;
   const verifier = localStorage.getItem(KEYS.codeVerifier);
   const clientId = localStorage.getItem(KEYS.clientId);
-  if(!verifier||!clientId){document.getElementById('gate').style.display='none';document.getElementById('setup').style.display='block';setAuthStatus('Setup incomplete. Try again.','error');return false;}
+  if(!verifier||!clientId){document.getElementById('setup').style.display='block';setAuthStatus('Setup incomplete. Try again.','error');return false;}
   setAuthStatus('Exchanging code for token…');
   state.clientId = clientId;
   try{
@@ -565,7 +522,6 @@ async function handleAuthCallback(){
     showApp();
     return true;
   }catch(e){
-    document.getElementById('gate').style.display='none';
     document.getElementById('setup').style.display='block';
     setAuthStatus('Token exchange failed: '+e.message,'error');
     return false;
@@ -1676,10 +1632,7 @@ document.addEventListener('visibilitychange', async () => {
   }
 });
 
-window.addEventListener('load',()=>{
-  const needsGate = maybeShowGate();
-  if(!needsGate)decideNextScreen();
-});
+window.addEventListener('load',()=>{ decideNextScreen(); });
 </script>
 </body>
 </html>
