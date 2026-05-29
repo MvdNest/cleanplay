@@ -1569,7 +1569,8 @@ async function playHere(){
 }
 
 function showSetup(){
-  document.getElementById('gate').style.display='none';
+  const gateEl = document.getElementById('gate');
+  if(gateEl) gateEl.style.display='none';
   document.getElementById('setup').style.display='block';
   document.getElementById('app').classList.remove('active');
   document.getElementById('redirect-uri-display').textContent = REDIRECT_URI;
