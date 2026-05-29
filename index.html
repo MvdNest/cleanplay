@@ -1153,10 +1153,12 @@ async function loadQueue(){
     // Spotify quirk: GET /me/player/queue often reports the same URI 5-10× when playing a
     // single-URI track on an SDK device. Collapse consecutive same-URI rows so the display
     // reflects the actual upcoming variety, not the buggy reporting.
+    const currentUri = data.currently_playing?.uri ?? null;
     const deduped = [];
     let lastUri = null;
     for(const t of queueArr){
       if(t?.uri && t.uri === lastUri) continue;
+      if(currentUri && t?.uri === currentUri) continue; // never show currently-playing track in "Up next"
       deduped.push(t);
       lastUri = t?.uri;
     }
