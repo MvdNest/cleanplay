@@ -572,7 +572,8 @@ async function verifyUser(){
     localStorage.removeItem(KEYS.accessToken);
     localStorage.removeItem(KEYS.refreshToken);
     state.accessToken=null;state.refreshToken=null;
-    document.getElementById('gate').style.display='none';
+    const gateEl3 = document.getElementById('gate');
+    if(gateEl3) gateEl3.style.display='none';
     document.getElementById('setup').style.display='block';
     setAuthStatus('Locked to "'+expected+'". You logged in as "'+me.id+'".','error');
     return false;
@@ -1245,7 +1246,8 @@ function toast(msg,kind){const el=document.getElementById('toast');el.textConten
 function copyText(spanId,btnId){const t=document.getElementById(spanId).textContent;navigator.clipboard?.writeText(t).then(()=>{const btn=document.getElementById(btnId);btn.textContent='Copied';btn.classList.add('copied');setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},2000);});}
 
 function showApp(){
-  document.getElementById('gate').style.display='none';
+  const gateEl2 = document.getElementById('gate');
+  if(gateEl2) gateEl2.style.display='none';
   document.getElementById('setup').style.display='none';
   document.getElementById('app').classList.add('active');
   document.getElementById('user-display').textContent = state.user?.display_name || state.user?.id || '';
