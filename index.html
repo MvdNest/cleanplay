@@ -1507,6 +1507,7 @@ function createWebPlayer(){
         // SDK disconnected — happens on iOS screen lock / background suspend
         state.sdkReady = false;
         state.sdkActivated = false;
+        stopIosKeepAlive();
         return;
       }
       const curUri = s.track_window?.current_track?.uri;
@@ -1518,6 +1519,8 @@ function createWebPlayer(){
       }
       // Track the URI of whatever is currently playing so the next end event has a reference.
       if(curUri && !s.paused) state._lastSdkPlayingUri = curUri;
+      // iOS keep-alive: maintain silent audio loop while SDK is playing
+      if(!s.paused){ startIosKeepAlive(); } else { stopIosKeepAlive(); }
     });
     player.connect().then(success => {
       console.log('[SDK] connect result:', success);
@@ -1535,8 +1538,24 @@ function activateSdkAudio(){
       state.webPlayer.activateElement();
       state.sdkActivated = true;
       console.log('[SDK] element activated for iOS audio');
+      startIosKeepAlive();
     }
   } catch(e){ console.warn('[SDK] activateElement failed:', e); }
+}
+
+function startIosKeepAlive() {
+  const el = document.getElementById('iosKeepAlive');
+  if (el && el.paused) {
+    el.play().catch(() => {}); // ignore if autoplay blocked
+  }
+}
+
+function stopIosKeepAlive() {
+  const el = document.getElementById('iosKeepAlive');
+  if (el && !el.paused) {
+    el.pause();
+    el.currentTime = 0;
+  }
 }
 
 async function playHere(){
@@ -1563,6 +1582,7 @@ function signOut(){
   clearInterval(state.progressTimer);
   if(state.sleepTimerInterval){clearInterval(state.sleepTimerInterval);state.sleepTimerInterval=null;}
   state.sleepTimerEnd=0;
+  stopIosKeepAlive();
   // Disconnect the Web Playback SDK so re-login can create a fresh player with new tokens.
   if(state.webPlayer){
     try{ state.webPlayer.disconnect(); }catch{}
@@ -1624,7 +1644,12 @@ document.addEventListener('visibilitychange', async () => {
     }catch{}
   }
 
-  // 2. Immediately refresh now-playing instead of waiting up to 5s for the poll tick
+  // 2. If SDK is the active device, ensure the keep-alive audio is still running
+  if(state.sdkReady && state.activeDeviceId === state.cleanplayDeviceId){
+    startIosKeepAlive();
+  }
+
+  // 3. Immediately refresh now-playing instead of waiting up to 5s for the poll tick
   if(state.accessToken && document.getElementById('app')?.classList.contains('active')){
     clearInterval(state.pollTimer);
     fetchState();
@@ -1634,5 +1659,6 @@ document.addEventListener('visibilitychange', async () => {
 
 window.addEventListener('load',()=>{ decideNextScreen(); });
 </script>
+<audio id="iosKeepAlive" loop preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" style="display:none"></audio>
 </body>
 </html>
