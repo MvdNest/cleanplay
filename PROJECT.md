@@ -76,7 +76,10 @@ Removed scopes (their endpoints are blocked in dev mode regardless): `user-libra
 
 ---
 
-## Three security layers
+## Two security layers
+
+> The local password/PIN gate (formerly "Layer 2") was removed — the app now goes straight
+> to Spotify auth. It caused re-prompt issues on iOS wake and added little real security.
 
 **Layer 1 — Spotify Development Mode**
 - The Spotify Developer App stays in Development Mode
@@ -84,18 +87,12 @@ Removed scopes (their endpoints are blocked in dev mode regardless): `user-libra
 - Configured at: https://developer.spotify.com/dashboard
 - Even with the public Client ID, no random user can auth
 
-**Layer 2 — Local password gate**
-- First visit asks user to set an access code (min 4 chars)
-- SHA-256 hashed, stored in localStorage as `cp_gate_hash`
-- Session unlock stored as `cp_gate_ok` in sessionStorage (cleared when browser closes)
-- Resettable from Settings view
-
-**Layer 3 — Spotify user ID lock**
+**Layer 2 — Spotify user ID lock**
 - After successful OAuth, app calls `/me` endpoint
 - Compares returned `user.id` against configured expected user ID
 - If mismatch: tokens cleared and user is rejected with explicit error
 
-**Important quirk:** the modern Spotify "Username" shown at spotify.com/account is NOT the API user ID. The API returns a long random string (e.g. `317gob37iku26e5zrab5nvtyvqhi`). That string is what the user ID lock should use, not the friendly username.
+**Important quirk:** the modern Spotify "Username" shown at spotify.com/account is NOT the API user ID. The API returns a long random string (e.g. `317gob37iku26e5zrab5nvtyvqhi`). That string is what the user ID lock should use, not the friendly username. (The lock comparison is case-insensitive.)
 
 ---
 
@@ -213,13 +210,14 @@ if($r -match 'YOUR_SEARCH_STRING'){"✓ live"} else {"✗ stale"}
 
 ---
 
-## Views (5 total)
+## Views (6 total)
 
-1. **Now Playing** — main view: track info, progress, controls, volume, device picker
+1. **Now Playing** — main view: track info, context line, lyrics (LRCLIB), progress, controls, volume, device picker, "Coming up" preview
 2. **Search** — track/artist/album/playlist search with filter pills
 3. **Library** — Recently Played + Liked Songs + User Playlists
-4. **Queue** — current playing + upcoming tracks
-5. **Settings** — sleep timer, device selector, account info, sign-out, reset access code
+4. **Queue** — current playing + upcoming tracks (deduped, "queued" badges)
+5. **Detail** — drill-down for album / playlist / artist (▶ Play all, playlist save)
+6. **Settings** — sleep timer, device selector, account info, sign-out
 
 **Layout responsiveness:**
 - Mobile (<1024px): single column, bottom tab bar
@@ -246,11 +244,11 @@ state = {
 ```
 
 `localStorage` keys (all prefixed `cp_`):
-- `cp_gate_hash` — SHA-256 of access code
 - `cp_client_id` — Spotify Dev App Client ID
-- `cp_expected_user_id` — for Layer 3 security
+- `cp_expected_user_id` — for the user ID lock
 - `cp_access_token`, `cp_refresh_token`, `cp_token_expires` — OAuth tokens
 - `cp_code_verifier` — temporary, deleted after token exchange
+- `cp_recent_queued` — URIs the user queued via + (6h TTL), used to badge "queued" rows
 
 ---
 

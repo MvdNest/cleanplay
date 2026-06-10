@@ -572,8 +572,6 @@ async function verifyUser(){
     localStorage.removeItem(KEYS.accessToken);
     localStorage.removeItem(KEYS.refreshToken);
     state.accessToken=null;state.refreshToken=null;
-    const gateEl3 = document.getElementById('gate');
-    if(gateEl3) gateEl3.style.display='none';
     document.getElementById('setup').style.display='block';
     setAuthStatus('Locked to "'+expected+'". You logged in as "'+me.id+'".','error');
     return false;
@@ -590,7 +588,13 @@ async function api(path,method='GET',body=null,callerOpts){
   if(body){reqOpts.headers['Content-Type']='application/json';reqOpts.body=JSON.stringify(body);}
   try{
     const r = await fetch('https://api.spotify.com/v1'+path,reqOpts);
-    if(r.status===401){const ok=await refreshTokenFn();if(ok)return api(path,method,body,callerOpts);signOut();return null;}
+    if(r.status===401){
+      // Retry once after a token refresh; a second 401 means the session is dead — avoid infinite recursion.
+      if(callerOpts && callerOpts._retried){signOut();return null;}
+      const ok=await refreshTokenFn();
+      if(ok)return api(path,method,body,{...(callerOpts||{}),_retried:true});
+      signOut();return null;
+    }
     if(r.status===429){if(!silent) toast('Rate-limited · slow down','error');return null;}
     if(r.status===403){
       // 403 in Spotify dev mode rarely means "Premium required" — usually it's a policy
@@ -792,7 +796,7 @@ function updateNowPlaying(data){
   const trackEl = document.getElementById('np-track');
   trackEl.textContent = track.name;
   trackEl.className = 'np-track' + (track.name.length<30?' italic':'');
-  document.getElementById('np-artist').textContent = track.artists.map(a=>a.name).join(' · ');
+  document.getElementById('np-artist').textContent = (track.artists||[]).map(a=>a.name).join(' · '); // episodes have no .artists
   const albumYear = track.album?.release_date ? new Date(track.album.release_date).getFullYear() : '';
   let albumLine = escapeHtml(track.album?.name||'');
   if(albumYear)albumLine += ' · '+albumYear;
@@ -800,8 +804,11 @@ function updateNowPlaying(data){
   document.getElementById('np-album').innerHTML = albumLine;
   if(data.device){
     document.getElementById('device-info').textContent = '▸ '+data.device.name+' · '+(data.device.type||'device');
-    document.getElementById('volume-slider').value = data.device.volume_percent ?? 80;
-    document.getElementById('vol-pct').textContent = data.device.volume_percent ?? '—';
+    const volSlider = document.getElementById('volume-slider');
+    if(document.activeElement !== volSlider){ // don't fight the user mid-drag
+      volSlider.value = data.device.volume_percent ?? 80;
+      document.getElementById('vol-pct').textContent = data.device.volume_percent ?? '—';
+    }
     document.getElementById('settings-device').textContent = data.device.name+' ('+(data.device.type||'device')+')';
   }
   document.getElementById('status-dot').classList.add('live');
@@ -884,7 +891,7 @@ async function nextTrack(){await api('/me/player/next'+devQS(false),'POST');setT
 async function prevTrack(){await api('/me/player/previous'+devQS(false),'POST');setTimeout(fetchState,600);}
 async function toggleShuffle(){state.shuffleState=!state.shuffleState;await api('/me/player/shuffle?state='+state.shuffleState+devQS(true),'PUT');updateControls();}
 async function toggleRepeat(){const modes=['off','context','track'];state.repeatState=modes[(modes.indexOf(state.repeatState)+1)%modes.length];await api('/me/player/repeat?state='+state.repeatState+devQS(true),'PUT');updateControls();toast('Repeat: '+state.repeatState);}
-async function setVolume(val){document.getElementById('vol-pct').textContent=val;await api('/me/player/volume?volume_percent='+val+devQS(true),'PUT');}
+function setVolume(val){document.getElementById('vol-pct').textContent=val;clearTimeout(setVolume._t);setVolume._t=setTimeout(()=>{api('/me/player/volume?volume_percent='+val+devQS(true),'PUT');},250);} // debounced — oninput fires per pixel while dragging
 async function seekTo(e){if(!state.localDuration)return;const rect=e.currentTarget.getBoundingClientRect();const pct=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));const ms=Math.floor(pct*state.localDuration);state.localProgress=ms;updateProgress();await api('/me/player/seek?position_ms='+ms+devQS(true),'PUT');}
 
 function setSearchFilter(filter){state.searchFilter=filter;document.querySelectorAll('.filter-pill').forEach(p=>p.classList.toggle('active',p.dataset.filter===filter));if(document.getElementById('search-input').value.trim())doSearch();}
@@ -917,12 +924,12 @@ function renderTrackItem(t,i,contextUri,extraBadgeHtml){
   const ctx = (typeof contextUri === 'string' && contextUri.startsWith('spotify:')) ? contextUri : null;
   const click = ctx ? `playUriInContext('${t.uri}','${ctx}')` : `playUri('${t.uri}',null)`;
   const badge = extraBadgeHtml || '';
-  return `<div class="item" onclick="${click}"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}${badge}</div><div class="item-subtitle">${escapeHtml(t.artists.map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div>${trackActionsHtml(t)}<div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;
+  return `<div class="item" onclick="${click}"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}${badge}</div><div class="item-subtitle">${escapeHtml((t.artists||[]).map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div>${trackActionsHtml(t)}<div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;
 }
 function renderArtistItem(a,i){return `<div class="item" onclick="openDetail('artist','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${(a.genres||[]).slice(0,3).join(' · ')||'Artist'}</div><div class="item-meta">${a.followers?.total?a.followers.total.toLocaleString()+' followers':''}</div></div></div>`;}
 function renderAlbumItem(a,i){return `<div class="item" onclick="openDetail('album','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${escapeHtml(a.artists.map(ar=>ar.name).join(', '))}</div><div class="item-meta">${a.album_type} · ${a.total_tracks} tracks · ${a.release_date?.slice(0,4)||''}</div></div></div>`;}
 function renderPlaylistItem(p,i){return `<div class="item" onclick="openDetail('playlist','${p.id}','${escapeAttr(p.name)}','${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${p.tracks?.total||0} tracks</div></div></div>`;}
-function escapeAttr(s){return String(s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escapeAttr(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 async function playUri(trackUri,contextUri){activateSdkAudio();const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};const path='/me/player/play'+devQS(false);await api(path,'PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
 async function playArtist(artistUri){activateSdkAudio();const path='/me/player/play'+devQS(false);await api(path,'PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
@@ -990,6 +997,10 @@ async function openDetail(type, id, name, uri){
     await loadPlaylistDetail(id);
   }
   else if(type === 'artist'){ saveBtn.style.display='none'; await loadArtistDetail(id); }
+  else { // e.g. 'show' context — no drill-down support; don't leave the spinner forever
+    saveBtn.style.display='none';
+    document.getElementById('detail-list').innerHTML = '<div class="empty">no detail view for this type</div>';
+  }
 }
 function closeDetail(){
   switchView(state.prevView || 'now-playing');
@@ -1148,7 +1159,7 @@ async function loadQueue(){
   let html = '';
   if(data.currently_playing){
     html += `<div class="list-section"><div class="list-section-title">Now playing</div></div>`;
-    html += `<div class="item playing"><div class="item-num">▸</div><div class="item-content"><div class="item-title">${escapeHtml(data.currently_playing.name)}</div><div class="item-subtitle">${escapeHtml(data.currently_playing.artists.map(a=>a.name).join(', '))}</div></div><div class="item-duration">${formatTime(data.currently_playing.duration_ms)}</div></div>`;
+    html += `<div class="item playing"><div class="item-num">▸</div><div class="item-content"><div class="item-title">${escapeHtml(data.currently_playing.name)}</div><div class="item-subtitle">${escapeHtml((data.currently_playing.artists||[]).map(a=>a.name).join(', '))}</div></div><div class="item-duration">${formatTime(data.currently_playing.duration_ms)}</div></div>`;
   }
   if(queueArr.length){
     // Spotify quirk: GET /me/player/queue often reports the same URI 5-10× when playing a
@@ -1227,6 +1238,7 @@ function closeModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.c
 
 document.addEventListener('keydown',(e)=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if(e.ctrlKey||e.metaKey||e.altKey)return; // don't hijack browser shortcuts (Ctrl+R, Cmd+S, …)
   if(!document.getElementById('app').classList.contains('active'))return;
   switch(e.key){
     case ' ':e.preventDefault();togglePlay();break;
@@ -1246,8 +1258,6 @@ function toast(msg,kind){const el=document.getElementById('toast');el.textConten
 function copyText(spanId,btnId){const t=document.getElementById(spanId).textContent;navigator.clipboard?.writeText(t).then(()=>{const btn=document.getElementById(btnId);btn.textContent='Copied';btn.classList.add('copied');setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},2000);});}
 
 function showApp(){
-  const gateEl2 = document.getElementById('gate');
-  if(gateEl2) gateEl2.style.display='none';
   document.getElementById('setup').style.display='none';
   document.getElementById('app').classList.add('active');
   document.getElementById('user-display').textContent = state.user?.display_name || state.user?.id || '';
@@ -1305,10 +1315,13 @@ async function refreshUpNext(){
   const data = await api('/me/player/queue', 'GET', null, {silent:true});
   if(!data || !Array.isArray(data.queue) || !data.queue.length){ sec.style.display = 'none'; return; }
   // Collapse Spotify's consecutive same-URI repeats (the SDK reporting quirk)
+  // and never show the currently-playing track in "Coming up" (same fix as the Queue view).
+  const upNextCurrentUri = data.currently_playing?.uri ?? state.currentTrackUri;
   const deduped = [];
   let lastUri = null;
   for(const t of data.queue){
     if(t?.uri && t.uri === lastUri) continue;
+    if(upNextCurrentUri && t?.uri === upNextCurrentUri) continue;
     deduped.push(t);
     lastUri = t?.uri;
   }
@@ -1571,8 +1584,6 @@ async function playHere(){
 }
 
 function showSetup(){
-  const gateEl = document.getElementById('gate');
-  if(gateEl) gateEl.style.display='none';
   document.getElementById('setup').style.display='block';
   document.getElementById('app').classList.remove('active');
   document.getElementById('redirect-uri-display').textContent = REDIRECT_URI;
