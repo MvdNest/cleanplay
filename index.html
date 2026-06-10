@@ -1058,11 +1058,11 @@ function trackActionsHtml(t){
   const queueSvg = '<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h10v-2H7v2zm0 4h10v-2H7v2zM7 7v2h14V7H7zm12 4h-2v2h-2v2h2v2h2v-2h2v-2h-2z"/></svg>';
   return `<div class="item-actions"><button class="icon-btn" onclick="event.stopPropagation();addToQueue('${t.uri}',event)" title="Add to queue">${queueSvg}</button></div>`;
 }
-function renderTrackItem(t,i,contextUri,extraBadgeHtml){
+function renderTrackItem(t,i,contextUri,extraBadgeHtml,clickJs){
   // Defensive: only honor a real Spotify URI string. Anything else (e.g. an array leaked from
   // Array.map's third callback arg) falls back to a single-track play to avoid 400 errors.
   const ctx = (typeof contextUri === 'string' && contextUri.startsWith('spotify:')) ? contextUri : null;
-  const click = ctx ? `playUriInContext('${t.uri}','${ctx}')` : `playUri('${t.uri}',null)`;
+  const click = clickJs || (ctx ? `playUriInContext('${t.uri}','${ctx}')` : `playUri('${t.uri}',null)`);
   const badge = extraBadgeHtml || '';
   return `<div class="item" onclick="${click}"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title">${escapeHtml(t.name)}${t.explicit?'<span class="np-explicit">E</span>':''}${badge}</div><div class="item-subtitle">${escapeHtml((t.artists||[]).map(a=>a.name).join(', '))}</div><div class="item-meta">${escapeHtml(t.album?.name||'')}</div></div>${trackActionsHtml(t)}<div class="item-duration">${formatTime(t.duration_ms)}</div></div>`;
 }
@@ -1108,6 +1108,19 @@ function getRecentQueuedUris(){
     return new Set(list.filter(x => x && x.ts > cutoff).map(x => x.uri));
   }catch{ return new Set(); }
 }
+// Spotify has no "skip to queue item" endpoint — playing a single URI wipes the rest of the
+// queue. Instead, when the user taps an upcoming track, we replay the *visible* remainder of
+// the queue as a uris list starting at their pick, so everything after it still plays.
+let _queueSnapshot = []; // deduped upcoming tracks, captured at render time by loadQueue/refreshUpNext
+async function playQueueFrom(idx){
+  const uris = _queueSnapshot.slice(idx).map(t=>t?.uri).filter(Boolean).slice(0,50);
+  if(!uris.length) return;
+  activateSdkAudio();
+  await api('/me/player/play'+devQS(false),'PUT',{uris});
+  setTimeout(fetchState,1000);
+  switchView('now-playing');
+}
+
 async function addToQueue(trackUri, ev){
   if(ev) ev.stopPropagation();
   const path = '/me/player/queue?uri=' + encodeURIComponent(trackUri) + (state.activeDeviceId?'&device_id='+state.activeDeviceId:'');
@@ -1326,13 +1339,14 @@ async function loadQueue(){
       deduped.push(t);
       lastUri = t?.uri;
     }
+    _queueSnapshot = deduped; // tapping a row plays from that point, preserving the rest
     html += `<div class="list-section"><div class="list-section-title">Up next <span class="list-section-count">${deduped.length}</span></div></div>`;
     // Mark rows the user explicitly queued via the + button so they stand out from autoplay
     // (Spotify's /me/player/queue mixes both kinds without flagging them).
     const userQueued = getRecentQueuedUris();
     html += deduped.slice(0,25).map((t,i) => {
       const badge = (t?.uri && userQueued.has(t.uri)) ? '<span class="queue-badge">queued</span>' : '';
-      return renderTrackItem(t, i, null, badge);
+      return renderTrackItem(t, i, null, badge, 'playQueueFrom('+i+')');
     }).join('');
   } else {
     html += '<div class="empty"><div class="empty-art">·</div>queue is empty</div>';
@@ -1490,6 +1504,7 @@ async function refreshUpNext(){
     lastUri = t?.uri;
   }
   if(!deduped.length){ sec.style.display = 'none'; return; }
+  _queueSnapshot = deduped; // tapping a row plays from that point, preserving the rest
   const userQueued = getRecentQueuedUris();
   const top = deduped.slice(0, 4);
   document.getElementById('up-next-list').innerHTML = top.map((t,i) => {
@@ -1497,7 +1512,7 @@ async function refreshUpNext(){
     const title = escapeHtml(t.name||'');
     const artist = escapeHtml((t.artists||[]).map(a=>a.name).join(', '));
     const dur = formatTime(t.duration_ms);
-    const onclick = t?.uri ? `playUri('${t.uri}',null)` : '';
+    const onclick = t?.uri ? `playQueueFrom(${i})` : '';
     return `<div class="${cls}" onclick="${onclick}"><div class="up-next-num">${String(i+1).padStart(2,'0')}</div><div class="up-next-info"><span class="up-next-track">${title}</span><span class="up-next-artist">· ${artist}</span></div><div class="up-next-dur">${dur}</div></div>`;
   }).join('');
   sec.style.display = 'block';

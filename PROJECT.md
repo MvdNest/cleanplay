@@ -135,6 +135,7 @@ Once activated in a session, `state.sdkActivated` is set to true and further cal
 | Playlist follow/unfollow (`PUT/DELETE /playlists/{id}/followers`) **works** in dev mode with `playlist-modify-private` scope, but `GET /playlists/{id}/followers/contains` is **403** | Maintain a local `followedPlaylistSet` populated from `/me/playlists` (which works); invalidate on every save toggle |
 | Playlist creation (`POST /users/{id}/playlists`) is **403** | No "create playlist" UI — users create in Spotify proper |
 | Artist follow (`PUT/DELETE /me/following?type=artist`) is **403** regardless of scope | UI was retired |
+| There is no "skip to queue item" endpoint; playing a single URI replaces the session and wipes the queue | Tapping an upcoming track replays the visible remainder of the queue as a `uris` list starting at the pick (`playQueueFrom`), so the rest keeps playing |
 | Spotify silently auto-redirects PKCE re-auth using the previously-granted scope set, ignoring the new scope list in the URL — even with `show_dialog=true` | If scopes need to change, the user must revoke at `spotify.com/account/apps` to force a fresh consent screen |
 
 ---
