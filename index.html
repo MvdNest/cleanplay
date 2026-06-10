@@ -87,9 +87,11 @@ input,textarea{font-family:inherit}
 .np-idle-icon{font-family:var(--serif);font-style:italic;font-size:48px;color:var(--muted-dim);margin-bottom:16px}
 .np-idle p{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;line-height:1.8}
 .progress-area{padding:16px 24px 12px}
-.progress-bar{background:var(--border);height:3px;border-radius:2px;cursor:pointer;position:relative;overflow:hidden}
-.progress-bar:hover{height:4px}
-.progress-fill{background:var(--accent);height:100%;border-radius:2px;transition:width 1s linear;width:0%;position:relative}
+.progress-bar{height:5px;border-radius:3px;cursor:pointer;position:relative;touch-action:none;padding:6px 0;background:linear-gradient(var(--border),var(--border)) center/100% 5px no-repeat}
+.progress-fill{background:var(--accent);height:5px;border-radius:3px;transition:width 1s linear;width:0%;position:relative;margin-top:0}
+.progress-fill::after{content:'';position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:12px;height:12px;border-radius:50%;background:var(--accent-bright);opacity:0;transition:opacity 0.2s;box-shadow:0 0 0 4px var(--accent-soft)}
+.progress-bar:hover .progress-fill::after,.progress-bar.dragging .progress-fill::after{opacity:1}
+.progress-bar.dragging .progress-fill{transition:none}
 .time-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;letter-spacing:1px}
 .controls{padding:8px 16px 24px;display:flex;align-items:center;justify-content:space-between;max-width:480px;margin:0 auto;width:100%}
 .ctrl{background:none;border:none;color:var(--text-soft);padding:12px;border-radius:50%;transition:all 0.2s;display:flex;align-items:center;justify-content:center;width:48px;height:48px;position:relative}
@@ -229,6 +231,28 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .toast.error{border-color:var(--danger);color:var(--danger)}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
+.eq{display:none;gap:2px;align-items:flex-end;height:11px}
+.eq i{width:2px;background:var(--accent);animation:eqbar 0.9s ease-in-out infinite;border-radius:1px}
+.eq i:nth-child(2){animation-delay:0.25s}
+.eq i:nth-child(3){animation-delay:0.5s}
+@keyframes eqbar{0%,100%{height:3px}50%{height:11px}}
+.np-artist-link,.np-album-link{cursor:pointer;border-bottom:1px dotted transparent;transition:border-color 0.2s,color 0.2s}
+.np-artist-link:hover{border-bottom-color:var(--accent)}
+.np-album-link:hover{color:var(--text-soft);border-bottom-color:var(--muted)}
+.resume-card{margin:28px auto 0;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;cursor:pointer;text-align:left;transition:all 0.2s}
+.resume-card:hover{border-color:var(--accent-dim);background:var(--surface-2)}
+.resume-label{font-family:var(--mono);font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:2.5px;margin-bottom:8px}
+.resume-track{font-family:var(--serif);font-style:italic;font-size:19px;color:var(--text);line-height:1.25;margin-bottom:4px;letter-spacing:-0.3px}
+.resume-artist{font-size:13px;color:var(--text-soft);text-transform:none;letter-spacing:normal}
+.resume-hint{font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:10px}
+.search-history{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.sh-label{font-family:var(--mono);font-size:9px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:2px;margin-right:2px}
+.sh-chip{background:var(--surface);border:1px solid var(--border-soft);color:var(--text-soft);padding:5px 12px;border-radius:999px;font-size:12px;transition:all 0.15s;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-chip:hover{color:var(--accent);border-color:var(--accent-dim)}
+.sh-clear{background:none;border:none;color:var(--muted-dim);font-size:14px;padding:2px 6px}
+.sh-clear:hover{color:var(--danger)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
 @media (min-width:1024px){
   .header{padding:16px 32px}
   .main{flex-direction:row;padding:0}
@@ -332,11 +356,17 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
     <div class="view-shell" style="flex:1;display:flex;flex-direction:column;min-width:0">
       <section class="view active" id="view-now-playing">
         <div class="np-container">
-          <div class="np-label">Now Playing</div>
+          <div class="np-label">Now Playing<span class="eq" id="np-eq"><i></i><i></i><i></i></span></div>
           <div id="np-loading" style="text-align:center;padding:40px 0;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase"><span class="spinner"></span>Connecting…</div>
           <div id="np-idle" class="np-idle" style="display:none">
             <div class="np-idle-icon">·</div>
             <p>nothing playing<br>open spotify · start any track<br>controls will appear here</p>
+            <div class="resume-card" id="np-resume" style="display:none">
+              <div class="resume-label">jump back in</div>
+              <div class="resume-track" id="np-resume-track"></div>
+              <div class="resume-artist" id="np-resume-artist"></div>
+              <div class="resume-hint">▶ tap to resume</div>
+            </div>
           </div>
           <div id="np-info" style="display:none">
             <div class="np-track" id="np-track">—</div>
@@ -350,7 +380,7 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
           </div>
         </div>
         <div class="progress-area">
-          <div class="progress-bar" id="progress-bar" onclick="seekTo(event)"><div class="progress-fill" id="progress-fill"></div></div>
+          <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
           <div class="time-row"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
         </div>
         <div class="controls">
@@ -390,6 +420,7 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
             <button class="filter-pill" data-filter="album" onclick="setSearchFilter('album')">Albums</button>
             <button class="filter-pill" data-filter="playlist" onclick="setSearchFilter('playlist')">Playlists</button>
           </div>
+          <div class="search-history" id="search-history"></div>
         </div>
         <div id="search-results"><div class="empty"><div class="empty-art">~</div>search anything · zero images returned</div></div>
       </section>
@@ -432,7 +463,10 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
             <button class="btn-ghost" onclick="signOut()">Sign out</button>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay · v2 · text only · no images, ever</div></div>
+            <div class="settings-info"><div class="settings-label">iPhone lock screen</div><div class="settings-detail">When playing in-browser (▶ Here), iOS shows Spotify's embedded player instead of the track — a Spotify SDK limitation with no workaround. Playing on the Spotify app (with CleanPlay as remote) shows full info, but with album art.</div></div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay · v2.2 · text only · no images, ever</div></div>
           </div>
         </div>
       </section>
@@ -473,7 +507,7 @@ const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 // Liking tracks, saving albums, and following artists are blocked by Spotify dev-mode policy
 // regardless of scope — those scopes have been removed since the corresponding UI was retired.
 const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','playlist-modify-private','user-read-email','user-read-private','streaming'].join(' ');
-const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier',recentQueued:'cp_recent_queued'};
+const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier',recentQueued:'cp_recent_queued',lastPlayed:'cp_last_played',searchHistory:'cp_search_history'};
 let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false,currentTrackId:null,currentTrackUri:null,currentContextUri:null,currentContextType:null,currentContextName:null,currentContextOwner:null,currentContextTracks:null,detail:null,prevView:'now-playing'};
 const followedPlaylistSet = new Set(); // playlist IDs in /me/playlists (owned or followed)
 const contextNameCache = new Map();   // uri -> {name, owner, tracks?}
@@ -688,6 +722,8 @@ async function fetchState(){
   state.currentTrackId = data.item.id;
   state.currentTrackUri = data.item.uri;
   state.currentTrack = data.item;  // keep full track so the lyrics lookup has artist/album/duration
+  // Remember what's playing so the idle screen can offer "jump back in" after the session dies
+  try{ localStorage.setItem(KEYS.lastPlayed, JSON.stringify({trackUri:data.item.uri,trackName:data.item.name,artists:(data.item.artists||[]).map(a=>a.name).join(', '),contextUri:data.context?.uri||null,ts:Date.now()})); }catch{}
   await updateContextLine(data.context, data.item);
   updateNowPlaying(data);updateControls();updateMediaSession(data);
   loadLyricsForCurrentTrack();
@@ -796,9 +832,19 @@ function updateNowPlaying(data){
   const trackEl = document.getElementById('np-track');
   trackEl.textContent = track.name;
   trackEl.className = 'np-track' + (track.name.length<30?' italic':'');
-  document.getElementById('np-artist').textContent = (track.artists||[]).map(a=>a.name).join(' · '); // episodes have no .artists
+  // Artist names are tappable → artist detail. Episodes have no .artists; show the podcast name.
+  const artistEl = document.getElementById('np-artist');
+  const artists = track.artists||[];
+  if(artists.length){
+    artistEl.innerHTML = artists.map(a=>a.id?`<span class="np-artist-link" onclick="openDetail('artist','${a.id}','${escapeAttr(a.name)}','spotify:artist:${a.id}')">${escapeHtml(a.name)}</span>`:escapeHtml(a.name)).join(' · ');
+  } else {
+    artistEl.textContent = track.show?.name || '';
+  }
   const albumYear = track.album?.release_date ? new Date(track.album.release_date).getFullYear() : '';
-  let albumLine = escapeHtml(track.album?.name||'');
+  // Album name is tappable → album detail
+  let albumLine = track.album?.id
+    ? `<span class="np-album-link" onclick="openDetail('album','${track.album.id}','${escapeAttr(track.album.name)}','spotify:album:${track.album.id}')">${escapeHtml(track.album.name)}</span>`
+    : escapeHtml(track.album?.name||'');
   if(albumYear)albumLine += ' · '+albumYear;
   if(track.explicit)albumLine += '<span class="np-explicit">E</span>';
   document.getElementById('np-album').innerHTML = albumLine;
@@ -815,9 +861,26 @@ function updateNowPlaying(data){
   updateProgress();
 }
 
+function renderResume(){
+  const el = document.getElementById('np-resume');
+  if(!el) return;
+  let lp=null; try{ lp=JSON.parse(localStorage.getItem(KEYS.lastPlayed)||'null'); }catch{}
+  if(!lp || !lp.trackUri){ el.style.display='none'; return; }
+  document.getElementById('np-resume-track').textContent = lp.trackName||'';
+  document.getElementById('np-resume-artist').textContent = lp.artists||'';
+  el.style.display='block';
+  el.onclick = () => {
+    const ctx = lp.contextUri||'';
+    // offset-play is only valid inside album/playlist contexts; artist/show contexts get a plain track play
+    if(/^spotify:(album|playlist):/.test(ctx)) playUriInContext(lp.trackUri, ctx);
+    else playUri(lp.trackUri, null);
+  };
+}
+
 function showIdle(){
   document.getElementById('np-loading').style.display='none';
   document.getElementById('np-idle').style.display='block';
+  renderResume();
   document.getElementById('np-info').style.display='none';
   document.getElementById('status-dot').classList.remove('live');
   document.getElementById('device-info').textContent='— no device active —';
@@ -832,9 +895,12 @@ function updateControls(){
   document.getElementById('play-icon').innerHTML = state.isPlaying ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
   document.getElementById('btn-shuffle').classList.toggle('active', state.shuffleState);
   document.getElementById('btn-repeat').classList.toggle('active', state.repeatState!=='off');
+  const eq = document.getElementById('np-eq');
+  if(eq) eq.style.display = state.isPlaying ? 'inline-flex' : 'none';
 }
 
 function updateProgress(){
+  if(state.seekDragging) return; // don't fight the user's finger on the progress bar
   if(!state.localDuration){
     document.getElementById('progress-fill').style.width='0%';
     document.getElementById('time-current').textContent='0:00';
@@ -860,12 +926,27 @@ function startProgressTick(){
     }
     // Sleep-timer expiry runs every tick regardless of playback state — otherwise a paused
     // session would never trigger the auto-pause and the status label would stay stuck.
-    if(state.sleepTimerEnd && Date.now() >= state.sleepTimerEnd){
-      if(state.isPlaying) api('/me/player/pause','PUT');
-      state.sleepTimerEnd=0;
-      if(state.sleepTimerInterval){clearInterval(state.sleepTimerInterval);state.sleepTimerInterval=null;}
-      document.getElementById('sleep-status').textContent='Off (timer expired)';
-      toast('Sleep timer · paused','success');
+    if(state.sleepTimerEnd){
+      const remaining = state.sleepTimerEnd - Date.now();
+      if(remaining <= 0){
+        if(state.isPlaying) api('/me/player/pause'+devQS(false),'PUT');
+        state.sleepTimerEnd=0;
+        if(state.sleepTimerInterval){clearInterval(state.sleepTimerInterval);state.sleepTimerInterval=null;}
+        document.getElementById('sleep-status').textContent='Off (timer expired)';
+        toast('Sleep timer · paused','success');
+        // Restore pre-fade volume (after the pause lands) so the next session isn't whisper-quiet
+        setTimeout(restoreFadeVolume, 1500);
+      } else if(remaining <= 30000 && state.isPlaying){
+        // Fade the last 30s down to a whisper instead of a hard cut
+        if(state._fadeStartVol==null) state._fadeStartVol = parseInt(document.getElementById('volume-slider').value)||80;
+        const target = Math.max(5, Math.round(state._fadeStartVol*remaining/30000));
+        if(target !== state._fadeLastSent){
+          state._fadeLastSent = target;
+          api('/me/player/volume?volume_percent='+target+devQS(true),'PUT',null,{silent:true});
+          const s = document.getElementById('volume-slider');
+          if(s && document.activeElement!==s){s.value=target;document.getElementById('vol-pct').textContent=target;}
+        }
+      }
     }
   }, 1000);
 }
@@ -888,17 +969,76 @@ async function togglePlay(){
   if('mediaSession' in navigator) navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
 }
 async function nextTrack(){await api('/me/player/next'+devQS(false),'POST');setTimeout(fetchState,600);}
-async function prevTrack(){await api('/me/player/previous'+devQS(false),'POST');setTimeout(fetchState,600);}
+async function prevTrack(){
+  // Standard player behavior: >3s into a track, "previous" restarts it; otherwise go back.
+  if(state.localProgress > 3000){
+    state.localProgress = 0; updateProgress();
+    await api('/me/player/seek?position_ms=0'+devQS(true),'PUT');
+    return;
+  }
+  await api('/me/player/previous'+devQS(false),'POST');setTimeout(fetchState,600);
+}
 async function toggleShuffle(){state.shuffleState=!state.shuffleState;await api('/me/player/shuffle?state='+state.shuffleState+devQS(true),'PUT');updateControls();}
 async function toggleRepeat(){const modes=['off','context','track'];state.repeatState=modes[(modes.indexOf(state.repeatState)+1)%modes.length];await api('/me/player/repeat?state='+state.repeatState+devQS(true),'PUT');updateControls();toast('Repeat: '+state.repeatState);}
 function setVolume(val){document.getElementById('vol-pct').textContent=val;clearTimeout(setVolume._t);setVolume._t=setTimeout(()=>{api('/me/player/volume?volume_percent='+val+devQS(true),'PUT');},250);} // debounced — oninput fires per pixel while dragging
-async function seekTo(e){if(!state.localDuration)return;const rect=e.currentTarget.getBoundingClientRect();const pct=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));const ms=Math.floor(pct*state.localDuration);state.localProgress=ms;updateProgress();await api('/me/player/seek?position_ms='+ms+devQS(true),'PUT');}
+function nudgeVolume(d){const s=document.getElementById('volume-slider');if(!s)return;const v=Math.max(0,Math.min(100,(parseInt(s.value)||0)+d));s.value=v;setVolume(v);}
+
+// Drag-to-seek (pointer events cover mouse + touch; replaces the old click-only seek)
+function initSeekDrag(){
+  const bar = document.getElementById('progress-bar');
+  if(!bar) return;
+  const pctOf = (e)=>{const r=bar.getBoundingClientRect();return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));};
+  const preview = (p)=>{
+    document.getElementById('progress-fill').style.width = (p*100)+'%';
+    document.getElementById('time-current').textContent = formatTime(p*state.localDuration);
+  };
+  bar.addEventListener('pointerdown',(e)=>{
+    if(!state.localDuration) return;
+    state.seekDragging = true;
+    bar.classList.add('dragging');
+    try{ bar.setPointerCapture(e.pointerId); }catch{}
+    preview(pctOf(e));
+  });
+  bar.addEventListener('pointermove',(e)=>{ if(state.seekDragging) preview(pctOf(e)); });
+  bar.addEventListener('pointerup',async (e)=>{
+    if(!state.seekDragging) return;
+    state.seekDragging = false;
+    bar.classList.remove('dragging');
+    const ms = Math.floor(pctOf(e)*state.localDuration);
+    state.localProgress = ms;
+    updateProgress();
+    await api('/me/player/seek?position_ms='+ms+devQS(true),'PUT');
+  });
+  bar.addEventListener('pointercancel',()=>{ state.seekDragging=false; bar.classList.remove('dragging'); updateProgress(); });
+}
 
 function setSearchFilter(filter){state.searchFilter=filter;document.querySelectorAll('.filter-pill').forEach(p=>p.classList.toggle('active',p.dataset.filter===filter));if(document.getElementById('search-input').value.trim())doSearch();}
+
+// ════ SEARCH HISTORY (last 8 queries, localStorage) ════
+function saveSearchTerm(q){
+  try{
+    let h = JSON.parse(localStorage.getItem(KEYS.searchHistory)||'[]');
+    h = h.filter(x => typeof x==='string' && x.toLowerCase()!==q.toLowerCase());
+    h.unshift(q);
+    localStorage.setItem(KEYS.searchHistory, JSON.stringify(h.slice(0,8)));
+  }catch{}
+  renderSearchHistory();
+}
+function renderSearchHistory(){
+  const el = document.getElementById('search-history');
+  if(!el) return;
+  let h=[]; try{ h = JSON.parse(localStorage.getItem(KEYS.searchHistory)||'[]'); }catch{}
+  el.innerHTML = h.length
+    ? '<span class="sh-label">recent</span>'+h.map(q=>`<button class="sh-chip" onclick="searchFromHistory('${escapeAttr(q)}')">${escapeHtml(q)}</button>`).join('')+'<button class="sh-clear" onclick="clearSearchHistory()" title="Clear history">×</button>'
+    : '';
+}
+function searchFromHistory(q){document.getElementById('search-input').value=q;doSearch();}
+function clearSearchHistory(){localStorage.removeItem(KEYS.searchHistory);renderSearchHistory();}
 
 async function doSearch(){
   const q = document.getElementById('search-input').value.trim();
   if(!q)return;
+  saveSearchTerm(q);
   const results = document.getElementById('search-results');
   results.innerHTML = '<div class="empty"><span class="spinner"></span>searching…</div>';
   // Spotify dev-mode apps reject limit values >10 with 400. With no limit, the API defaults to 5.
@@ -1123,17 +1263,29 @@ function updateDetailSaveBtn(){
   if(label) label.textContent = saved ? 'Saved' : 'Save';
 }
 
+let _likedUris = []; // populated by loadLibrary, consumed by shuffleLiked
+async function shuffleLiked(){
+  if(!_likedUris.length){toast('Open Library first','error');return;}
+  activateSdkAudio();
+  const shuffled = [..._likedUris].sort(()=>Math.random()-0.5);
+  await api('/me/player/play'+devQS(false),'PUT',{uris:shuffled});
+  setTimeout(fetchState,1000);
+  switchView('now-playing');
+  toast('Shuffling liked songs','success');
+}
+
 async function loadLibrary(){
   const list = document.getElementById('library-list');
   list.innerHTML = '<div class="empty"><span class="spinner"></span>loading library…</div>';
-  const [recent,saved,playlists] = await Promise.all([api('/me/player/recently-played?limit=10'),api('/me/tracks?limit=15'),api('/me/playlists?limit=20')]);
+  const [recent,saved,playlists] = await Promise.all([api('/me/player/recently-played?limit=10'),api('/me/tracks?limit=50'),api('/me/playlists?limit=20')]);
   let html = '';
   if(recent?.items?.length){
     html += `<div class="list-section"><div class="list-section-title">Recently played <span class="list-section-count">${recent.items.length}</span></div></div>`;
     html += recent.items.map((it,i)=>renderTrackItem(it.track,i)).join('');
   }
   if(saved?.items?.length){
-    html += `<div class="list-section"><div class="list-section-title">Liked songs <span class="list-section-count">${saved.total||saved.items.length}</span></div></div>`;
+    _likedUris = saved.items.map(it=>it.track?.uri).filter(Boolean);
+    html += `<div class="list-section"><div class="list-section-title"><span>Liked songs <span class="list-section-count">${saved.total||saved.items.length}</span></span><button class="up-next-link" onclick="shuffleLiked()">⇄ shuffle</button></div></div>`;
     html += saved.items.map((it,i)=>renderTrackItem(it.track,i)).join('');
   }
   if(playlists?.items?.length){
@@ -1208,8 +1360,18 @@ async function transferTo(deviceId){
   toast('Device selected','success');
 }
 
+function restoreFadeVolume(){
+  if(state._fadeStartVol==null) return;
+  const v = state._fadeStartVol;
+  state._fadeStartVol=null; state._fadeLastSent=null;
+  api('/me/player/volume?volume_percent='+v+devQS(true),'PUT',null,{silent:true});
+  const s = document.getElementById('volume-slider');
+  if(s){s.value=v;const p=document.getElementById('vol-pct');if(p)p.textContent=v;}
+}
+
 function setSleepTimer(minutes){
   if(state.sleepTimerInterval)clearInterval(state.sleepTimerInterval);
+  restoreFadeVolume(); // cancelling/extending mid-fade brings the volume back up
   if(minutes===0){state.sleepTimerEnd=0;document.getElementById('sleep-status').textContent='Off';closeModal();toast('Sleep timer off');return;}
   state.sleepTimerEnd = Date.now()+minutes*60000;
   document.getElementById('sleep-status').textContent = minutes+' min';
@@ -1246,6 +1408,8 @@ document.addEventListener('keydown',(e)=>{
     case 'ArrowLeft':if(e.shiftKey)prevTrack();break;
     case 's':toggleShuffle();break;
     case 'r':toggleRepeat();break;
+    case 'ArrowUp':e.preventDefault();nudgeVolume(5);break;
+    case 'ArrowDown':e.preventDefault();nudgeVolume(-5);break;
     case '/':e.preventDefault();switchView('search');document.getElementById('search-input').focus();break;
     case 'Escape':closeModal();break;
   }
@@ -1673,7 +1837,7 @@ document.addEventListener('visibilitychange', async () => {
   }
 });
 
-window.addEventListener('load',()=>{ decideNextScreen(); });
+window.addEventListener('load',()=>{ decideNextScreen(); initSeekDrag(); renderSearchHistory(); });
 </script>
 <audio id="iosKeepAlive" loop preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" style="display:none"></audio>
 </body>

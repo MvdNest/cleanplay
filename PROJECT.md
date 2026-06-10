@@ -249,6 +249,8 @@ state = {
 - `cp_access_token`, `cp_refresh_token`, `cp_token_expires` — OAuth tokens
 - `cp_code_verifier` — temporary, deleted after token exchange
 - `cp_recent_queued` — URIs the user queued via + (6h TTL), used to badge "queued" rows
+- `cp_last_played` — last playing track/context, powers the idle screen "jump back in" resume card
+- `cp_search_history` — last 8 search queries, shown as chips under the search box
 
 ---
 
@@ -264,11 +266,14 @@ state = {
 
 - `Space` — play/pause
 - `Shift + →` — next track
-- `Shift + ←` — previous track
+- `Shift + ←` — previous track (restarts current track if >3s in)
+- `↑` / `↓` — volume ±5
 - `s` — toggle shuffle
 - `r` — cycle repeat (off → context → track)
 - `/` — focus search input
 - `Esc` — close any open modal
+
+Modifier combos (Ctrl/Cmd/Alt) are ignored so browser shortcuts still work.
 
 ---
 
@@ -316,6 +321,7 @@ state = {
 3. Added Spotify Web Playback SDK — in-browser playback works on Edge desktop
 4. Fixed Spotify API quirks: search limit, transfer 500, market parameter
 5. Fixed iOS Safari audio with `player.activateElement()` — works on iPhone now
+6. **v2.2** — Quality-of-life pass: "jump back in" resume card on idle screen, sleep-timer 30s fade-out, drag-to-seek progress bar (touch + mouse), search history chips, ⇄ shuffle for Liked Songs, tappable artist/album on Now Playing, smart previous (restart >3s), ↑/↓ volume keys, equalizer animation, focus-visible + reduced-motion support
 
 ---
 
