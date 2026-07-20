@@ -6,6 +6,7 @@ CleanPlay is a private, text-only Spotify controller designed for iPhone and des
 
 - Remote control for an existing Spotify Connect device
 - Optional in-browser playback through Spotify's Web Playback SDK (Premium required)
+- Automatic playback targeting: use an active/sole Connect device, otherwise prepare this browser from the user's Play tap
 - Search, Now Playing, queue, lyrics, device selection, and a sleep timer
 - Local, text-only **Listen Later** for tracks, albums, artists, and playlists
 - Installable iPhone PWA with a standalone layout, safe-area support, and an offline app shell
@@ -18,7 +19,7 @@ CleanPlay does not download music and cannot play while offline. The service wor
 
 For the most reliable lock/unlock experience, keep playback on the Spotify app, a speaker, a computer, or another Spotify Connect device and use CleanPlay as the remote. iOS can suspend a Home Screen web app and its embedded Spotify player while the phone is locked, so **Play here** is convenient but inherently less reliable after a long background period.
 
-Open the site in Safari, use **Share > Add to Home Screen**, then launch CleanPlay from its icon. If iOS has suspended in-browser playback, reopen the app and tap a playback action; CleanPlay will refresh authorization, discard stale device IDs, and reconnect the embedded player.
+Open the site in Safari, use **Share > Add to Home Screen**, then launch CleanPlay from its icon. If no Spotify Connect device is available, a Play tap prepares CleanPlay itself as the target instead of sending a targetless request. If iOS has suspended in-browser playback, reopen the app and tap a playback action; CleanPlay will refresh authorization, discard stale device IDs, and reconnect the embedded player.
 
 ## Setup
 
@@ -27,6 +28,8 @@ Open the site in Safari, use **Share > Add to Home Screen**, then launch CleanPl
 3. In Development Mode, add any permitted listener under the app's User Management settings. Spotify currently limits Development Mode apps and requires the app owner to have Premium.
 4. Open CleanPlay and enter the app's Client ID. A Client ID is public by design; never put a Spotify Client Secret into this browser-only app.
 5. Leave the optional account field blank to lock CleanPlay to the first account that connects, or enter a known Spotify Web API account/user ID. This local guardrail is not a second password and does not replace Spotify authorization or Development Mode access control. Once a browser is locked, deliberately changing the account requires clearing that site's data.
+
+Spotify's Web Playback SDK requires the `streaming`, `user-read-private`, and `user-read-email` authorization scopes. CleanPlay requests all three for SDK compatibility but never accesses, displays, persists, or logs the email address.
 
 The deployed app's setup screen walks through the same process.
 

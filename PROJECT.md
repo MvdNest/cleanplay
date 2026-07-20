@@ -22,6 +22,8 @@ CleanPlay provides a calm Spotify interface with text metadata and no artwork. I
 1. **Remote-first (recommended on iPhone):** control Spotify on a phone, speaker, computer, car, or another Connect device. This survives iPhone lock/background cycles most reliably.
 2. **Play here:** use Spotify's Web Playback SDK to make the browser a device. It is useful on desktop and for foreground iPhone sessions, but iOS may suspend the PWA and invalidate its SDK device while locked.
 
+If exactly one unrestricted Connect device is available, it may be selected even while inactive. If no Connect device exists, an intentional Play tap may prepare the local SDK target. Never send a playback-start request with neither an explicit target nor a currently active Spotify session.
+
 Spotify SDK device IDs are ephemeral session identifiers, not durable preferences. The app must recover clearly instead of routing controls to a remembered device that no longer exists.
 
 ## Artwork boundary
@@ -70,6 +72,8 @@ A Client ID is public by design. Never embed a Client Secret in the app, setting
 
 Spotify Development Mode is the real access boundary: only the owner and accounts allowed in User Management can authorize, subject to Spotify's current limits. The Development Mode app owner must maintain Premium under the 2026 rules.
 
+The Web Playback SDK requires `streaming`, `user-read-private`, and `user-read-email`. The last scope is requested only because Spotify requires it for SDK authorization; CleanPlay must not access, display, persist, or log the email field. If an older grant lacks an SDK scope, refresh cannot add it: require one complete PKCE reconnection.
+
 If setup's account field is blank, CleanPlay locks itself to the first account that connects successfully. An advanced user can enter a known API account/user ID. This is a local wrong-account guardrail, not a password, encryption layer, or substitute for Spotify authorization. A profile display name and the friendly username on spotify.com are not the API identifier.
 
 Spotify added stable `account_id` in May 2026 and recommends it instead of `id` for account linking. Compatibility logic should accept `account_id` and legacy `id`; new automatic locks should prefer `account_id` when available.
@@ -96,10 +100,10 @@ v3 recovery follows these rules:
 
 1. Serialize foreground/network recovery so several lifecycle signals cannot race.
 2. Refresh authorization first when necessary; do not sign out for a transient failure.
-3. Check the SDK instance. When the browser device vanished, clear stale active/device IDs and reconnect or recreate it.
+3. Check the SDK instance. When the browser device emitted `not_ready`, clear stale active/device IDs and reconnect or recreate it. A null `player_state_changed` payload can simply mean the new device has no playback context and must not trigger a rebuild loop.
 4. Treat the next SDK `ready` ID as authoritative. Never persist an SDK device ID in local storage.
-5. Refresh Spotify device and playback state before routing new controls.
-6. When a targeted request reports a missing device, clear that target and retry without it only when the operation is safe to repeat.
+5. Refresh Spotify device and playback state before routing new controls. Ignore restricted devices; prefer the active device, an in-memory selection, or the sole unrestricted candidate.
+6. When a targeted request reports a missing device, clear that target and retry once only when the operation is safe to repeat. Do not fall through to a targetless request.
 7. Restart ordinary polling after recovery settles.
 
 Keep recovery idempotent and visible in diagnostics. iOS still requires `player.activateElement()` during a real tap before in-browser audio starts; automated wake logic cannot manufacture that gesture.

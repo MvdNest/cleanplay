@@ -561,7 +561,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.0 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.1 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -592,16 +592,25 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>
-window.onSpotifyWebPlaybackSDKReady = function(){ window._sdkReady = true; if(typeof createWebPlayer === 'function') createWebPlayer(); };
+// Loading the SDK must not create a playback device by itself. The player is
+// instantiated from an intentional Play/Here tap so iOS can activate audio in
+// the same gesture and remote-first wake-ups stay lightweight.
+window.onSpotifyWebPlaybackSDKReady = function(){ window._sdkReady = true; };
 </script>
 <!-- Spotify Web Playback SDK is loaded only after authentication. -->
 <script>
 'use strict';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
-// Scopes are limited to playback, library reading, private playlists, and in-browser streaming.
-// Profile email is deliberately not requested or displayed.
-const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','user-read-private','streaming'].join(' ');
-const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',authIssuedAt:'cp_auth_issued_at',codeVerifier:'cp_code_verifier',oauthState:'cp_oauth_state',recentQueued:'cp_recent_queued',lastPlayed:'cp_last_played',searchHistory:'cp_search_history'};
+// Spotify's Web Playback SDK requires user-read-email together with streaming and
+// user-read-private. CleanPlay requests that compatibility scope but never accesses,
+// displays, persists, or logs the account email address.
+const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','user-read-private','user-read-email','streaming'].join(' ');
+const REQUIRED_SDK_SCOPES = ['streaming','user-read-private','user-read-email'];
+function hasRequiredSdkScopes(value){
+  const granted=new Set(String(value||'').split(/\s+/).filter(Boolean));
+  return REQUIRED_SDK_SCOPES.every(function(scope){return granted.has(scope);});
+}
+const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',authIssuedAt:'cp_auth_issued_at',authScopes:'cp_auth_scopes',codeVerifier:'cp_code_verifier',oauthState:'cp_oauth_state',recentQueued:'cp_recent_queued',lastPlayed:'cp_last_played',searchHistory:'cp_search_history'};
 let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false,currentTrackId:null,currentTrackUri:null,currentContextUri:null,currentContextType:null,currentContextName:null,currentContextOwner:null,currentContextTracks:null,detail:null,prevView:'now-playing'};
 const contextNameCache = new Map();   // uri -> {name, owner, tracks?}
 const lyricsCache = new Map();        // trackId -> {found, plain, syncedLines, instrumental}
@@ -783,6 +792,13 @@ async function fetchState(){
   const data = await api('/me/player','GET',null,{silent:true});
   if(!data){state.playbackHydrated=false;return false;}
   state.playbackHydrated=true;
+  if(data.device&&data.device.id&&data.device.is_restricted!==true){
+    state.activeDeviceId=data.device.id;
+    state.activeDeviceName=String(data.device.name||'Spotify device').slice(0,120);
+    state.activeDeviceType=String(data.device.type||'device').slice(0,60);
+    if(data.device.id===state.cleanplayDeviceId)setPreferredTarget('here');
+    else if(state.preferredTarget&&state.preferredTarget.kind==='remote')setPreferredTarget('remote',data.device.id);
+  }
   if(!data.item){
     // CASE A: Spotify reports nothing playing, but we were just at the end of a track.
     // Likely the SDK stopped without auto-advancing — force /next.
@@ -964,7 +980,18 @@ function showIdle(){
   renderResume();
   document.getElementById('np-info').style.display='none';
   document.getElementById('status-dot').classList.remove('live');
-  document.getElementById('device-info').textContent='— no device active —';
+  const deviceInfo=document.getElementById('device-info');
+  const settingsDevice=document.getElementById('settings-device');
+  if(state.sdkReady&&state.cleanplayDeviceId&&state.activeDeviceId===state.cleanplayDeviceId){
+    deviceInfo.textContent='CleanPlay - this device - ready';
+    if(settingsDevice)settingsDevice.textContent='CleanPlay (this device)';
+  }else if(state.activeDeviceId){
+    deviceInfo.textContent=state.activeDeviceName?'▸ '+state.activeDeviceName+' · selected':'▸ Spotify device selected';
+    if(settingsDevice)settingsDevice.textContent=state.activeDeviceName||'Spotify device';
+  }else{
+    deviceInfo.textContent='— no device active —';
+    if(settingsDevice)settingsDevice.textContent='—';
+  }
   state.currentTrackId = null; state.currentTrackUri = null; state.currentTrack = null;
   state.currentContextUri = null; state.currentContextName = null; state.currentContextTracks = null;
   document.getElementById('lyrics-section').style.display='none';
@@ -1847,7 +1874,11 @@ Object.assign(state,{
   resumePromise:null,
   needsSdkRecovery:false,
   confirmedVolume:80,
-  lifecycleReason:'manual'
+  lifecycleReason:'manual',
+  activeDeviceName:null,
+  activeDeviceType:null,
+  sdkAuthFailures:0,
+  authScopes:''
 });
 
 function noteDiagnostic(category,event,fields){
@@ -1901,7 +1932,8 @@ function startPolling(){
   state.pollTimer=setInterval(function(){if(isAppVisible())fetchState();},15000);
 }
 
-function loadSpotifySdk(){
+function loadSpotifySdk(options){
+  const silent=!!(options&&options.silent);
   if(window.Spotify&&window.Spotify.Player){window._sdkReady=true;return Promise.resolve();}
   if(state.sdkScriptPromise)return state.sdkScriptPromise;
   noteDiagnostic('sdk','sdk_load',{reason:'manual',target:state.preferredTarget.kind});
@@ -1923,7 +1955,7 @@ function loadSpotifySdk(){
     const failedScript=document.querySelector('script[data-cleanplay-sdk]');
     if(failedScript)failedScript.remove();
     noteDiagnostic('sdk','sdk_connect',{reason:'manual',target:state.preferredTarget.kind,outcome:'failed'});
-    setConnectionHealth('error','Player unavailable','CleanPlay could not load the in-browser player. Remote devices can still work.','The in-browser player could not load. Check the connection and retry.');
+    if(!silent)setConnectionHealth('error','Player unavailable','CleanPlay could not load the in-browser player. Remote devices can still work.','The in-browser player could not load. Check the connection and retry.');
     throw error;
   });
   return state.sdkScriptPromise;
@@ -1945,7 +1977,9 @@ function invalidateSdkDevice(reason,reportedId){
   state.sdkActivated=false;
   state.needsSdkRecovery=true;
   state.cleanplayDeviceId=null;
-  if(state.activeDeviceId&&(state.activeDeviceId===stale||state.activeDeviceId===reportedId))state.activeDeviceId=null;
+  if(state.activeDeviceId&&(state.activeDeviceId===stale||state.activeDeviceId===reportedId)){
+    state.activeDeviceId=null;state.activeDeviceName=null;state.activeDeviceType=null;
+  }
   resolveSdkReady(false);
   noteDiagnostic('sdk',reason==='not_ready'?'sdk_not_ready':'sdk_rebuild',{reason:reason,target:'here',outcome:'retry'});
 }
@@ -1953,7 +1987,7 @@ function disconnectWebPlayer(){
   const player=state.webPlayer;
   const stale=state.cleanplayDeviceId;
   if(stale)state.staleCleanplayDeviceId=stale;
-  if(stale&&state.activeDeviceId===stale)state.activeDeviceId=null;
+  if(stale&&state.activeDeviceId===stale){state.activeDeviceId=null;state.activeDeviceName=null;state.activeDeviceType=null;}
   state.webPlayer=null;
   state.sdkReady=false;
   state.sdkActivated=false;
@@ -1965,7 +1999,7 @@ function createWebPlayer(){
   if(state.webPlayer||!state.accessToken||!window.Spotify||!window.Spotify.Player)return state.webPlayer;
   makeSdkReadyPromise();
   const player=new Spotify.Player({
-    name:'CleanPlay - this iPhone',
+    name:'CleanPlay - this device',
     getOAuthToken:function(callback){
       Promise.resolve(ensureToken()).then(function(ok){
         if(ok&&state.accessToken)callback(state.accessToken);
@@ -1980,8 +2014,13 @@ function createWebPlayer(){
     const staleId=state.staleCleanplayDeviceId;
     state.cleanplayDeviceId=payload.device_id;
     state.sdkReady=true;
+    state.sdkAuthFailures=0;
     state.needsSdkRecovery=false;
-    if(state.preferredTarget.kind==='here'||state.activeDeviceId&&(state.activeDeviceId===oldId||state.activeDeviceId===staleId))state.activeDeviceId=payload.device_id;
+    if(state.preferredTarget.kind==='here'||state.activeDeviceId&&(state.activeDeviceId===oldId||state.activeDeviceId===staleId)){
+      state.activeDeviceId=payload.device_id;
+      state.activeDeviceName='CleanPlay - this device';
+      state.activeDeviceType='Computer';
+    }
     state.staleCleanplayDeviceId=null;
     resolveSdkReady(true);
     noteDiagnostic('sdk','sdk_ready',{reason:state.lifecycleReason||'manual',target:'here',outcome:'ok'});
@@ -1990,7 +2029,7 @@ function createWebPlayer(){
     if(pending&&typeof pending.run==='function'){
       state.pendingPlaybackIntent=null;
       if(state.sdkActivated&&Date.now()-pending.createdAt<15000)Promise.resolve().then(pending.run);
-      else setConnectionHealth('recovering','Tap play again','iOS needs one fresh tap now that the player is ready.','Tap play once more to enable audio on this iPhone.');
+      else setConnectionHealth('recovering','Tap play again','This browser needs one fresh tap now that the player is ready.','Tap play once more to enable audio on this device.');
     }
   });
   player.addListener('not_ready',function(payload){
@@ -2000,6 +2039,11 @@ function createWebPlayer(){
   player.addListener('authentication_error',function(){
     invalidateSdkDevice('auth');
     noteDiagnostic('sdk','sdk_auth_error',{reason:'auth',target:'here',outcome:'retry'});
+    state.sdkAuthFailures=(state.sdkAuthFailures||0)+1;
+    if(state.sdkAuthFailures>=2){
+      requireSpotifyReconnect('Spotify needs one fresh connection to restore in-browser playback permission. Your Listen Later list is still saved.');
+      return;
+    }
     Promise.resolve(ensureToken(true)).then(function(ok){if(ok&&isAppVisible())rebuildWebPlayer('auth');});
   });
   player.addListener('initialization_error',function(){
@@ -2007,20 +2051,21 @@ function createWebPlayer(){
     setConnectionHealth('error','Player unavailable','The browser player could not start. Remote Spotify devices remain available.','The in-browser player could not start.');
   });
   player.addListener('account_error',function(){
-    setConnectionHealth('error','Premium needed','In-browser playback requires Spotify Premium. Remote control may still work.','Spotify Premium is needed for playback on this iPhone.');
+    setConnectionHealth('error','Premium needed','In-browser playback requires Spotify Premium. Remote control may still work.','Spotify Premium is needed for playback on this device.');
   });
   player.addListener('autoplay_failed',function(){
     state.sdkActivated=false;state.pendingPlaybackIntent=null;
     noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
-    setConnectionHealth('recovering','Tap play again','iOS blocked autoplay after the player changed.','Tap play once more to enable audio on this iPhone.');
+    setConnectionHealth('recovering','Tap play again','The browser blocked autoplay after the player changed.','Tap play once more to enable audio on this device.');
   });
   player.addListener('playback_error',function(){
     noteDiagnostic('playback','command_failed',{reason:'manual',target:'here',outcome:'failed'});
   });
   player.addListener('player_state_changed',function(sdkState){
     if(!sdkState){
-      invalidateSdkDevice('null_state');
-      if(isAppVisible())setTimeout(function(){resumeSession('null_state');},250);
+      // A newly connected SDK device legitimately reports null until it has a
+      // playback context. `not_ready` is the authoritative disconnect signal;
+      // treating an idle null state as a dead device creates a rebuild loop.
       return;
     }
     const current=sdkState.track_window&&sdkState.track_window.current_track&&sdkState.track_window.current_track.uri;
@@ -2076,7 +2121,7 @@ function activateSdkAudio(){
       activation.catch(function(){
         state.sdkActivated=false;
         noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
-        setConnectionHealth('recovering','Tap play again','iOS did not enable audio on the first attempt.','Tap play once more to enable audio on this iPhone.');
+        setConnectionHealth('recovering','Tap play again','The browser did not enable audio on the first attempt.','Tap play once more to enable audio on this device.');
       });
     }
     noteDiagnostic('lifecycle','visible',{reason:'gesture',target:'here',outcome:'ok'});
@@ -2093,22 +2138,32 @@ async function reconcileDevices(){
     noteDiagnostic('recovery','device_reconcile',{reason:'device_missing',target:state.preferredTarget.kind,outcome:'degraded'});
     return false;
   }
-  const devices=data.devices.filter(Boolean);
+  const devices=data.devices.filter(function(device){return !!(device&&device.id)&&device.is_restricted!==true;});
   const localId=state.cleanplayDeviceId;
   if(state.preferredTarget.kind==='here'){
     const localListed=!!localId&&devices.some(function(device){return device.id===localId;});
     if(state.sdkReady&&localId&&localListed){
       state.activeDeviceId=localId;
+      state.activeDeviceName='CleanPlay - this device';
+      state.activeDeviceType='Computer';
       noteDiagnostic('recovery','device_reconcile',{reason:'wake',target:'here',outcome:'ok'});
       return true;
     }
     state.activeDeviceId=null;
+    state.activeDeviceName=null;state.activeDeviceType=null;
     return false;
   }
-  let selected=state.preferredTarget.deviceId&&devices.find(function(device){return device.id===state.preferredTarget.deviceId;});
-  if(!selected)selected=devices.find(function(device){return device.is_active&&device.id!==localId;});
-  if(!selected&&state.activeDeviceId)selected=devices.find(function(device){return device.id===state.activeDeviceId&&device.id!==localId;});
+  const remoteDevices=devices.filter(function(device){return device.id!==localId;});
+  let selected=state.preferredTarget.deviceId&&remoteDevices.find(function(device){return device.id===state.preferredTarget.deviceId;});
+  if(!selected)selected=remoteDevices.find(function(device){return device.is_active;});
+  if(!selected&&state.activeDeviceId)selected=remoteDevices.find(function(device){return device.id===state.activeDeviceId;});
+  // An inactive Connect device is still a valid explicit target. Selecting the
+  // sole candidate avoids a targetless Play request while never guessing when
+  // several devices are available.
+  if(!selected&&remoteDevices.length===1)selected=remoteDevices[0];
   state.activeDeviceId=selected?selected.id:null;
+  state.activeDeviceName=selected?String(selected.name||'Spotify device').slice(0,120):null;
+  state.activeDeviceType=selected?String(selected.type||'device').slice(0,60):null;
   if(selected&&state.preferredTarget.deviceId!==selected.id)setPreferredTarget('remote',selected.id);
   noteDiagnostic('recovery','device_reconcile',{reason:'wake',target:selected?'remote':'none',outcome:selected?'ok':'degraded'});
   return !!selected;
@@ -2144,15 +2199,18 @@ async function resumeSession(reason){
       return false;
     }
     if(state.preferredTarget.kind==='here'){
-      if(!state.webPlayer)await initWebPlayer();
-      else{
-        let sdkState=null;
-        try{sdkState=await state.webPlayer.getCurrentState();}catch{}
-        if(!sdkState)state.needsSdkRecovery=true;
-      }
-      if(state.needsSdkRecovery||!state.sdkReady)await rebuildWebPlayer(reason);
+      // `player_state_changed(null)` and getCurrentState() === null are normal
+      // for a ready device with no playback context. Rebuild only after a real
+      // lifecycle/not_ready signal or when no ready SDK instance exists.
+      if(!state.webPlayer||state.needsSdkRecovery||!state.sdkReady)await rebuildWebPlayer(reason);
     }else if(state.webPlayer)disconnectWebPlayer();
     const deviceReady=await reconcileDevices();
+    if(!deviceReady&&state.preferredTarget.kind==='remote'){
+      // Warm only the SDK script. No browser device is created until a real
+      // playback tap, preserving remote-first wake behavior while allowing that
+      // tap to activate the local player synchronously on iOS.
+      loadSpotifySdk({silent:true}).catch(function(){});
+    }
     const playbackReady=await fetchState();
     startPolling();
     if(!playbackReady){
@@ -2183,20 +2241,38 @@ function showApp(){
   resumeSession('manual');
 }
 async function playHere(){
-  if(!state.webPlayer&&window.Spotify&&window.Spotify.Player)createWebPlayer();
-  activateSdkAudio();
   setPreferredTarget('here');
+  state.lifecycleReason='gesture';
+  if(!window.Spotify||!window.Spotify.Player){
+    setConnectionHealth('recovering','Preparing this device','Loading the in-browser player. Tap Here once more if audio does not start.','Preparing playback on this device...');
+    await initWebPlayer();
+    if(!state.webPlayer)return false;
+    setConnectionHealth('recovering','Tap Here again','The player is loaded and needs one fresh tap to enable audio.','Tap Here once more to enable audio on this device.');
+    return false;
+  }
+
+  if(!state.webPlayer)createWebPlayer();
+  else if(state.needsSdkRecovery)rebuildWebPlayerForGesture();
+  activateSdkAudio();
+
+  if(!state.sdkReady&&state.sdkReadyPromise){
+    setConnectionHealth('recovering','Preparing this device','Connecting the in-browser Spotify player.','Preparing playback on this device...');
+    await state.sdkReadyPromise;
+  }
   if(!state.sdkReady||!state.cleanplayDeviceId){
-    if(window.Spotify&&window.Spotify.Player)rebuildWebPlayerForGesture();
-    setConnectionHealth('recovering','Preparing iPhone','The in-browser player is reconnecting.','Preparing playback on this iPhone...');
-    resumeSession('gesture');
-    return;
+    setConnectionHealth('recovering','Tap Here again','The player needs one fresh tap to finish audio activation.','Tap Here once more to enable audio on this device.');
+    return false;
   }
   state.activeDeviceId=state.cleanplayDeviceId;
+  state.activeDeviceName='CleanPlay - this device';
+  state.activeDeviceType='Computer';
   const info=document.getElementById('device-info');
-  if(info)info.textContent='CleanPlay - this iPhone - selected';
-  setConnectionHealth('online','Ready here','Playback target is this iPhone.');
-  toast('This iPhone is ready','success');
+  const settingsDevice=document.getElementById('settings-device');
+  if(info)info.textContent='CleanPlay - this device - ready';
+  if(settingsDevice)settingsDevice.textContent='CleanPlay (this device)';
+  setConnectionHealth('online','Ready here','Playback target is this device.');
+  toast('This device is ready','success');
+  return true;
 }
 // ==== CLEANPLAY V3: BOUNDED PLAYBACK RECOVERY ================================
 function playbackTargetKind(){return state.activeDeviceId&&state.cleanplayDeviceId&&state.activeDeviceId===state.cleanplayDeviceId?'here':(state.activeDeviceId?'remote':'none');}
@@ -2220,6 +2296,14 @@ async function recoverPlaybackTarget(reason){
   return reconcileDevices();
 }
 async function playerCommand(command,requestFactory){
+  if(command!=='transfer'&&!state.activeDeviceId){
+    const found=await reconcileDevices();
+    if(!found){
+      noteDiagnostic('playback','command_failed',{reason:'device_missing',target:'none',outcome:'failed'});
+      setConnectionHealth('error','Choose where to play','Tap Here to use this device, or open Spotify on another device.','Choose a playback device before trying that control.');
+      return false;
+    }
+  }
   for(let attempt=0;attempt<2;attempt++){
     const request=requestFactory(),failure={};
     const result=await api(request.path,request.method||'PUT',request.body===undefined?null:request.body,{silent:true,failureSink:failure});
@@ -2228,7 +2312,7 @@ async function playerCommand(command,requestFactory){
       if(attempt)setConnectionHealth('online','Connected','Playback recovered on the selected device.');
       return true;
     }
-    const missingDevice=failure.status===404;
+    const missingDevice=failure.status===404&&failure.reason==='device_missing';
     if(attempt===0&&missingDevice){
       noteDiagnostic('playback','command_retry',{status:404,attempt:1,reason:'device_missing',target:playbackTargetKind(),outcome:'retry'});
       if(await recoverPlaybackTarget('device_missing'))continue;
@@ -2242,15 +2326,38 @@ async function playerCommand(command,requestFactory){
   return false;
 }
 function preparePlaybackIntent(label,run){
-  const wantsHere=state.preferredTarget.kind==='here'||state.activeDeviceId&&state.activeDeviceId===state.cleanplayDeviceId;
-  if(!wantsHere)return false;
-  if(!state.webPlayer&&window.Spotify&&window.Spotify.Player)createWebPlayer();
-  if(state.sdkReady&&state.cleanplayDeviceId){activateSdkAudio();return false;}
-  if(window.Spotify&&window.Spotify.Player){rebuildWebPlayerForGesture();state.needsSdkRecovery=false;activateSdkAudio();}
-  else initWebPlayer();
+  const canStartPlayback=label==='play'||label==='resume_last'||label.indexOf('play_')===0;
+  let wantsHere=state.preferredTarget.kind==='here'||state.activeDeviceId&&state.activeDeviceId===state.cleanplayDeviceId;
+  if(!wantsHere&&!state.activeDeviceId&&canStartPlayback){
+    // No Connect device exists. Use the same intentional tap to prepare the
+    // browser as the playback target instead of sending a targetless 404.
+    setPreferredTarget('here');
+    wantsHere=true;
+    noteDiagnostic('recovery','command_retry',{reason:'device_missing',target:'here',outcome:'retry'});
+  }
+  if(!wantsHere){
+    if(!state.activeDeviceId){
+      setConnectionHealth('error','Choose where to play','Tap Here to use this device, or open Spotify on another device.','Choose a playback device before trying that control.');
+      return true;
+    }
+    return false;
+  }
+  if(state.sdkReady&&state.cleanplayDeviceId){
+    state.activeDeviceId=state.cleanplayDeviceId;
+    state.activeDeviceName='CleanPlay - this device';
+    state.activeDeviceType='Computer';
+    activateSdkAudio();
+    return false;
+  }
   state.pendingPlaybackIntent={label:label,run:run,createdAt:Date.now()};
+  if(window.Spotify&&window.Spotify.Player){
+    if(!state.webPlayer)createWebPlayer();
+    else if(state.needsSdkRecovery)rebuildWebPlayerForGesture();
+    state.needsSdkRecovery=false;
+    activateSdkAudio();
+  }else initWebPlayer();
   noteDiagnostic('recovery','command_retry',{reason:'gesture',target:'here',outcome:'retry'});
-  setConnectionHealth('recovering','Waking player','Your request is saved and will run when this iPhone is ready.','Waking the in-browser player. Your request is waiting...');
+  setConnectionHealth('recovering','Waking player','Your request is saved and will run when this device is ready.','Waking the in-browser player. Your request is waiting...');
   return true;
 }
 async function playBody(label,body){
@@ -2262,8 +2369,21 @@ async function playBody(label,body){
   if(preparePlaybackIntent(label,run))return false;
   return run();
 }
+function lastPlayedBody(){
+  try{
+    const item=JSON.parse(localStorage.getItem(KEYS.lastPlayed)||'null');
+    if(!item||!/^spotify:track:[A-Za-z0-9]+$/.test(String(item.trackUri||'')))return null;
+    const context=String(item.contextUri||'');
+    if(/^spotify:(album|playlist):[A-Za-z0-9]+$/.test(context))return {context_uri:context,offset:{uri:item.trackUri}};
+    return {uris:[item.trackUri]};
+  }catch{return null;}
+}
 async function togglePlay(forcePlaying){
   const nextPlaying=typeof forcePlaying==='boolean'?forcePlaying:!state.isPlaying;
+  if(nextPlaying&&!state.isPlaying&&!state.currentTrackUri){
+    const remembered=lastPlayedBody();
+    if(remembered)return playBody('resume_last',remembered);
+  }
   const run=async function(){
     const ok=await playerCommand(nextPlaying?'play':'pause',function(){return {path:withPlaybackTarget(nextPlaying?'/me/player/play':'/me/player/pause'),method:'PUT'};});
     if(ok){state.isPlaying=nextPlaying;updateControls();if('mediaSession'in navigator)navigator.mediaSession.playbackState=nextPlaying?'playing':'paused';}
@@ -2775,11 +2895,12 @@ function clearOAuthAttempt(){
   localStorage.removeItem(KEYS.oauthState);
 }
 function clearAuthTokens(){
-  state.accessToken=null;state.refreshToken=null;state.tokenExpires=0;state.authIssuedAt=0;
+  state.accessToken=null;state.refreshToken=null;state.tokenExpires=0;state.authIssuedAt=0;state.authScopes='';
   localStorage.removeItem(KEYS.accessToken);
   localStorage.removeItem(KEYS.refreshToken);
   localStorage.removeItem(KEYS.tokenExpires);
   localStorage.removeItem(KEYS.authIssuedAt);
+  localStorage.removeItem(KEYS.authScopes);
 }
 function endAuthorizedSession(){
   if(typeof stopPolling==='function')stopPolling();
@@ -2791,7 +2912,7 @@ function endAuthorizedSession(){
   try{localStorage.removeItem(KEYS.sleepTimerEnd);}catch{}
   if(typeof disconnectWebPlayer==='function')disconnectWebPlayer();
   else if(state.webPlayer){try{state.webPlayer.disconnect();}catch{}state.webPlayer=null;}
-  state.cleanplayDeviceId=null;state.sdkReady=false;state.sdkActivated=false;state.activeDeviceId=null;state.user=null;
+  state.cleanplayDeviceId=null;state.sdkReady=false;state.sdkActivated=false;state.activeDeviceId=null;state.activeDeviceName=null;state.activeDeviceType=null;state.user=null;
   clearAuthTokens();
 }
 function requireSpotifyReconnect(message){
@@ -2845,7 +2966,12 @@ async function handleAuthCallback(){
   try{
     const response=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:REDIRECT_URI,client_id:clientId,code_verifier:verifier})});
     if(!response.ok)throw new Error('oauth_exchange_failed');
-    saveTokens(await response.json(),Date.now());
+    const tokenData=await response.json();
+    saveTokens(tokenData,Date.now());
+    if(tokenData.scope&&!hasRequiredSdkScopes(tokenData.scope)){
+      requireSpotifyReconnect('Spotify did not grant the permissions required for in-browser playback. Connect again and approve the playback request.');
+      return false;
+    }
     if(!await verifyUser())return false;
     showApp();return true;
   }catch{
@@ -2860,6 +2986,10 @@ function saveTokens(data,authorizationIssuedAt){
   localStorage.setItem(KEYS.accessToken,state.accessToken);
   if(state.refreshToken)localStorage.setItem(KEYS.refreshToken,state.refreshToken);
   localStorage.setItem(KEYS.tokenExpires,String(state.tokenExpires));
+  if(typeof data.scope==='string'&&data.scope.trim()){
+    state.authScopes=data.scope.trim();
+    localStorage.setItem(KEYS.authScopes,state.authScopes);
+  }
   if(Number.isFinite(Number(authorizationIssuedAt))&&Number(authorizationIssuedAt)>0){
     state.authIssuedAt=Number(authorizationIssuedAt);
     localStorage.setItem(KEYS.authIssuedAt,String(state.authIssuedAt));
@@ -2929,13 +3059,19 @@ async function verifyUser(){
     return false;
   }
   if(!expected)localStorage.setItem(KEYS.expectedUserId,preferredId);
-  state.user=me;
+  state.user={account_id:accountId||null,id:legacyId||null,display_name:me.display_name||'',product:me.product||''};
   return true;
 }
 function verifyIdentityFirst(){return verifyUser();}
 async function api(path,method='GET',body=null,callerOpts){
   const options=callerOpts&&typeof callerOpts==='object'?callerOpts:{},silent=!!options.silent,failureSink=options.failureSink;
-  const fail=function(status,kind){if(failureSink&&typeof failureSink==='object'){failureSink.status=status;failureSink.kind=kind;}};
+  const fail=function(status,reason){
+    if(failureSink&&typeof failureSink==='object'){
+      failureSink.status=status;
+      failureSink.reason=reason;
+      failureSink.kind=reason;
+    }
+  };
   if(!await ensureToken({reason:'token_expired'})){fail(401,'auth');return null;}
   const request={method:method,headers:{Authorization:'Bearer '+state.accessToken}};
   if(body){request.headers['Content-Type']='application/json';request.body=JSON.stringify(body);}
@@ -2968,7 +3104,18 @@ async function api(path,method='GET',body=null,callerOpts){
     }
     if(response.status===204)return {};
     if(!response.ok){
-      fail(response.status,'api');
+      let failureReason='api';
+      if(response.status===404){
+        let reasonText='';
+        try{
+          const errorBody=await response.json(),spotifyError=errorBody&&errorBody.error||{};
+          reasonText=String(spotifyError.reason||'')+' '+String(spotifyError.message||'');
+        }catch{}
+        if(/no[_\s-]*active[_\s-]*device|device[_\s-]*(?:not[_\s-]*found|unavailable|missing)|unknown[_\s-]*device/i.test(reasonText)||(!reasonText.trim()&&/[?&]device_id=/.test(path))){
+          failureReason='device_missing';
+        }else failureReason='not_found';
+      }
+      fail(response.status,failureReason);
       if(typeof logDiagnostic==='function')logDiagnostic('api_error',{category:'api',status:response.status,reason:'manual',outcome:'failed'});
       if(!silent)toast('Spotify request failed ('+response.status+')','error');
       return null;
@@ -2994,6 +3141,11 @@ async function decideNextScreen(){
   state.refreshToken=localStorage.getItem(KEYS.refreshToken);
   state.tokenExpires=parseInt(localStorage.getItem(KEYS.tokenExpires)||'0',10)||0;
   state.authIssuedAt=parseInt(localStorage.getItem(KEYS.authIssuedAt)||'0',10)||0;
+  state.authScopes=localStorage.getItem(KEYS.authScopes)||'';
+  if(state.authScopes&&!hasRequiredSdkScopes(state.authScopes)){
+    requireSpotifyReconnect('Spotify needs one fresh connection to restore in-browser playback permission. Your Listen Later list is still saved.');
+    return;
+  }
   if(state.clientId&&(state.accessToken||state.refreshToken)){
     let canVerify=false;
     if(state.refreshToken){
@@ -3006,6 +3158,10 @@ async function decideNextScreen(){
         return;
       }
       if(refreshed.status==='invalid_grant')return;
+      if(state.authScopes&&!hasRequiredSdkScopes(state.authScopes)){
+        requireSpotifyReconnect('Spotify needs one fresh connection to restore in-browser playback permission. Your Listen Later list is still saved.');
+        return;
+      }
     }else canVerify=!!state.accessToken&&Date.now()<state.tokenExpires;
     if(canVerify){
       if(await verifyUser()){showApp();return;}
