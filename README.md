@@ -11,6 +11,7 @@ CleanPlay is a private, text-only Spotify controller designed for iPhone and des
 - Local, text-only **Listen Later** for tracks, albums, artists, and playlists
 - Installable iPhone PWA with a standalone layout, safe-area support, and an offline app shell
 - Wake/reconnect handling for expired access tokens and short-lived Spotify SDK device IDs
+- One-tap iPhone playback recovery after screen lock, with bounded foreground reconnect attempts
 - Local, redacted diagnostics that can be copied for troubleshooting
 
 CleanPlay does not download music and cannot play while offline. The service worker caches only the app shell.

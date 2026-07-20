@@ -96,11 +96,11 @@ Official references:
 
 The original iPhone failure was a PWA waking with an access token or SDK device ID that had stopped being valid during lock. Player calls then returned `401`, `404`, `NO_ACTIVE_DEVICE`, or "device not found."
 
-v3 recovery follows these rules:
+v3.2 recovery follows these rules:
 
-1. Serialize foreground/network recovery so several lifecycle signals cannot race.
+1. Serialize foreground/network recovery so several lifecycle signals cannot race. A foreground or manual retry supersedes work that was suspended while hidden, and every network/recovery attempt is bounded.
 2. Refresh authorization first when necessary; do not sign out for a transient failure.
-3. Check the SDK instance. When the browser device emitted `not_ready`, clear stale active/device IDs and reconnect or recreate it. A null `player_state_changed` payload can simply mean the new device has no playback context and must not trigger a rebuild loop.
+3. Preserve the active SDK instance while the app is hidden so screen lock does not interrupt audio. Mark its short-lived device ID as unconfirmed, then let the first post-wake Play tap re-register and activate the browser player before sending playback unless a current visible `ready` event already proved it healthy. A null `player_state_changed` payload can simply mean the new device has no playback context and must not trigger a rebuild loop.
 4. Treat the next SDK `ready` ID as authoritative. Never persist an SDK device ID in local storage.
 5. Refresh Spotify device and playback state before routing new controls. Ignore restricted devices; prefer the active device, an in-memory selection, or the sole unrestricted candidate.
 6. When a targeted request reports a missing device, clear that target and retry once only when the operation is safe to repeat. Do not fall through to a targetless request.

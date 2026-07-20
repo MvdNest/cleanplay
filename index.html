@@ -18,9 +18,9 @@
 <style>
 :root{--bg:#0d0d0e;--bg-warm:#131312;--surface:#19191b;--surface-2:#222225;--border:#343438;--border-soft:#242428;--text:#f7f5ee;--text-soft:#d0cec6;--muted:#929198;--muted-dim:#626168;--accent:#d9ad5b;--accent-bright:#efc875;--accent-dim:#92733a;--accent-soft:rgba(217,173,91,0.13);--danger:#ef8585;--success:#80c99b;--serif:ui-serif,'New York','Iowan Old Style','Palatino Linotype',Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;--mono:ui-monospace,'SFMono-Regular','SF Mono',Menlo,Consolas,monospace;--max-width:1280px;--sidebar-width:240px;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+html,body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overflow-x:hidden}
 body{background:radial-gradient(ellipse at top,rgba(212,164,73,0.04),transparent 50%),radial-gradient(ellipse at bottom right,rgba(212,164,73,0.02),transparent 50%),var(--bg);background-attachment:fixed;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
-button{font-family:inherit;cursor:pointer}
+button{font:inherit;cursor:pointer}
 input,textarea{font-family:inherit}
 ::selection{background:var(--accent-soft);color:var(--accent-bright)}
 ::-webkit-scrollbar{width:8px;height:8px}
@@ -93,12 +93,12 @@ input,textarea{font-family:inherit}
 .progress-bar.dragging .progress-fill{transition:none}
 .time-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;letter-spacing:1px}
 .controls{padding:8px 16px 24px;display:flex;align-items:center;justify-content:space-between;max-width:480px;margin:0 auto;width:100%}
-.ctrl{background:none;border:none;color:var(--text-soft);padding:12px;border-radius:50%;transition:all 0.2s;display:flex;align-items:center;justify-content:center;width:48px;height:48px;position:relative}
-.ctrl svg{width:22px;height:22px;fill:currentColor}
+.ctrl{background:none;border:none;color:var(--text-soft);padding:11px;border-radius:50%;transition:all 0.2s;display:flex;align-items:center;justify-content:center;width:44px;height:44px;position:relative}
+.ctrl svg{width:18px;height:18px;fill:currentColor}
 .ctrl:hover{color:var(--accent);background:var(--surface)}
 .ctrl:active{transform:scale(0.92)}
-.ctrl.primary{background:var(--accent);color:#1a1408;width:64px;height:64px}
-.ctrl.primary svg{width:26px;height:26px}
+.ctrl.primary{background:var(--accent);color:#1a1408;width:54px;height:54px}
+.ctrl.primary svg{width:22px;height:22px}
 .ctrl.primary:hover{background:var(--accent-bright);color:#1a1408}
 .ctrl.active{color:var(--accent)}
 .ctrl.active::after{content:'';position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent)}
@@ -143,11 +143,13 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .empty{text-align:center;padding:60px 24px;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;line-height:1.8}
 .empty-art{font-family:var(--serif);font-style:italic;font-size:56px;color:var(--muted-dim);margin-bottom:16px}
 .item-actions{display:flex;gap:2px;align-items:center;flex-shrink:0;margin-left:6px}
-.icon-btn{background:none;border:none;color:var(--muted);padding:7px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
-.icon-btn svg{width:16px;height:16px;fill:currentColor;display:block}
-.icon-btn:hover{color:var(--accent);background:var(--surface-2)}
+.icon-btn{background:none;border:none;color:var(--muted);padding:7px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;position:relative;font-size:14px;line-height:1}
+.icon-btn svg{width:14px;height:14px;fill:currentColor;display:block;position:relative;z-index:1}
+.icon-btn>span{font-size:14px;line-height:1;position:relative;z-index:1}
+.icon-btn:hover{color:var(--accent)}
 .icon-btn:active{transform:scale(0.92)}
-.icon-btn.saved{color:var(--accent);background:var(--accent-soft)}
+.icon-btn.saved{color:var(--accent);background:transparent}
+.icon-btn.saved::before{content:'';position:absolute;inset:8px;border-radius:6px;background:var(--accent-soft)}
 .heart-btn svg path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
 .heart-btn.liked svg path{fill:currentColor;stroke:none}
 .heart-btn.liked{color:var(--accent)}
@@ -186,6 +188,8 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .ctx-save-btn.liked{color:var(--accent)}
 .ctx-save-btn:hover{color:var(--accent);background:var(--surface-2)}
 .ctx-save-btn.show{display:inline-flex}
+.ctx-save-btn{position:relative}
+.ctx-save-btn::before{content:'';position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
 .detail-header{padding:24px 24px 16px;border-bottom:1px solid var(--border-soft);display:flex;flex-direction:column;gap:8px}
 .detail-back{align-self:flex-start;background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:6px 0;cursor:pointer;transition:color 0.15s}
 .detail-back:hover{color:var(--accent)}
@@ -198,7 +202,7 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .detail-actions .btn-ghost{padding:10px 14px;font-size:10px}
 .tabs{position:fixed;bottom:0;left:0;right:0;background:rgba(13,13,14,0.92);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:8px 0 calc(8px + var(--safe-bottom));z-index:100;justify-content:space-around}
 .tab{flex:1;background:none;border:none;color:var(--muted);padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:color 0.2s;max-width:100px}
-.tab svg{width:22px;height:22px;fill:currentColor}
+.tab svg{width:18px;height:18px;fill:currentColor}
 .tab-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:1.5px}
 .tab.active{color:var(--accent)}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:200;display:none;align-items:flex-end;justify-content:center;animation:overlayIn 0.2s ease}
@@ -208,7 +212,7 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg-warm)}
 .modal-title{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--text);font-weight:500}
-.modal-close{background:none;border:none;color:var(--muted);font-size:24px;padding:4px 8px;line-height:1}
+.modal-close{background:none;border:none;color:var(--muted);font-size:20px;padding:4px 8px;line-height:1}
 .modal-close:hover{color:var(--accent)}
 .modal-content{padding:16px 0}
 .device-item{display:flex;align-items:center;gap:14px;padding:14px 24px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid var(--border-soft)}
@@ -252,7 +256,9 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .sh-clear{background:none;border:none;color:var(--muted-dim);font-size:14px;padding:2px 6px}
 .sh-clear:hover{color:var(--danger)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent-bright);outline-offset:3px}
-button{min-height:44px}
+.btn-primary,.btn-ghost,.btn-accent,.status-chip,.save-btn,.filter-pill,.sh-chip,.tab,.ctrl,.icon-btn,.search-box button,.device-bar button,.detail-back,.up-next-link,.modal-close,.timer-btn,.lyrics-toggle{min-height:44px}
+.sh-clear,.modal-close{min-width:44px;min-height:44px}
+@media(hover:hover){.icon-btn:hover{background:var(--surface-2)}}
 body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
 .header{min-height:58px;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));box-shadow:0 1px 0 rgba(255,255,255,.015)}
 .header-brand{letter-spacing:-.8px}
@@ -307,8 +313,9 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
   .item{padding:12px 16px;gap:11px}
   .item-num{width:20px}
   .item-duration{display:none}
-  .tabs{padding-top:5px}
-  .tab{min-height:58px;padding:6px 2px}
+  .tabs{padding-top:4px}
+  .tab{min-height:52px;padding:5px 2px}
+  .tab svg{width:17px;height:17px}
   .tab-label{font-size:8px;letter-spacing:.9px}
   .settings-row{padding:15px 20px}
   .saved-toolbar{padding-left:20px;padding-right:20px}
@@ -399,7 +406,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
   </header>
   <div class="connection-banner" id="connection-banner" role="status" aria-live="polite">
     <span id="connection-banner-text">Restoring your session...</span>
-    <button type="button" onclick="resumeSession('banner')">Retry</button>
+    <button type="button" onclick="resumeSession('banner',{force:true})">Retry</button>
   </div>
   <div class="main">
     <nav class="tabs" aria-label="Primary navigation">
@@ -561,7 +568,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.1 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.2 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -592,12 +599,12 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>
-// Loading the SDK must not create a playback device by itself. The player is
-// instantiated from an intentional Play/Here tap so iOS can activate audio in
-// the same gesture and remote-first wake-ups stay lightweight.
+// Preload the SDK class before the first tap. The player itself is still
+// created only after authentication, but iOS then has a real player available
+// for activateElement() during the user's first Play/Here gesture.
 window.onSpotifyWebPlaybackSDKReady = function(){ window._sdkReady = true; };
 </script>
-<!-- Spotify Web Playback SDK is loaded only after authentication. -->
+<script src="https://sdk.scdn.co/spotify-player.js" defer></script>
 <script>
 'use strict';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
@@ -781,7 +788,8 @@ async function forceNextIfStuck(reason, uri){
   }, 400);
 }
 
-async function fetchState(){
+async function fetchState(guard){
+  const isCurrent=typeof guard==='function'?guard:function(){return true;};
   // Capture previous state — used by the auto-advance fallback when /me/player returns nothing
   // immediately after a track was supposed to end.
   const prevUri = state.currentTrackUri;
@@ -790,6 +798,7 @@ async function fetchState(){
   const prevWasPlaying = state.isPlaying;
 
   const data = await api('/me/player','GET',null,{silent:true});
+  if(!isCurrent())return false;
   if(!data){state.playbackHydrated=false;return false;}
   state.playbackHydrated=true;
   if(data.device&&data.device.id&&data.device.is_restricted!==true){
@@ -819,6 +828,7 @@ async function fetchState(){
   if(state.webPlayer && data.device?.id === state.cleanplayDeviceId){
     try{
       const sdkState = await state.webPlayer.getCurrentState();
+      if(!isCurrent())return false;
       if(sdkState && typeof sdkState.position === 'number') progress = sdkState.position;
     }catch{}
   }
@@ -837,7 +847,8 @@ async function fetchState(){
   state.currentTrack = data.item;  // keep full track so the lyrics lookup has artist/album/duration
   // Remember what's playing so the idle screen can offer "jump back in" after the session dies
   try{ localStorage.setItem(KEYS.lastPlayed, JSON.stringify({trackUri:data.item.uri,trackName:data.item.name,artists:(data.item.artists||[]).map(a=>a.name).join(', '),contextUri:data.context?.uri||null,ts:Date.now()})); }catch{}
-  await updateContextLine(data.context, data.item);
+  const contextUpdated=await updateContextLine(data.context,data.item,isCurrent);
+  if(contextUpdated===false||!isCurrent())return false;
   updateNowPlaying(data);updateControls();updateMediaSession(data);
   const shouldRefreshQueue=state._lastQueueTrackUri!==data.item.uri||Date.now()-(state._queueRefreshAt||0)>60000;
   if(shouldRefreshQueue){state._lastQueueTrackUri=data.item.uri;state._queueRefreshAt=Date.now();refreshUpNext();}
@@ -845,14 +856,16 @@ async function fetchState(){
   return true;
 }
 
-async function updateContextLine(ctx, currentTrack){
+async function updateContextLine(ctx,currentTrack,guard){
+  const isCurrent=typeof guard==='function'?guard:function(){return true;};
+  if(!isCurrent())return false;
   const el = document.getElementById('np-context');
   const linkEl = document.getElementById('np-context-link');
   const posEl = document.getElementById('np-context-pos');
   if(!ctx || !ctx.uri){
     if(el) el.style.display = 'none';
     state.currentContextUri = null; state.currentContextType = null; state.currentContextName = null; state.currentContextOwner = null; state.currentContextTracks = null;
-    return;
+    return true;
   }
   if(ctx.uri !== state.currentContextUri){
     state.currentContextUri = ctx.uri;
@@ -869,15 +882,18 @@ async function updateContextLine(ctx, currentTrack){
       else { info = {name: ctx.type}; }
       if(endpoint){
         const obj = await api(endpoint);
+        if(!isCurrent())return false;
         info = {name: obj?.name || ctx.type, owner: obj?.owner?.display_name || null};
       }
       // For playlist/album also cache track URIs to compute "track N of M"
       if(ctx.type === 'playlist'){
         const tlist = await api('/playlists/'+ctx.uri.split(':').pop()+'/items?limit=50&fields=items(item(uri))');
+        if(!isCurrent())return false;
         info.trackUris = (tlist?.items||[]).map(entry=>(entry.item||entry.track)?.uri).filter(Boolean);
         info.total = info.trackUris.length;
       } else if(ctx.type === 'album'){
         const tlist = await api('/albums/'+ctx.uri.split(':').pop()+'/tracks?limit=50');
+        if(!isCurrent())return false;
         info.trackUris = (tlist?.items||[]).map(it=>it.uri).filter(Boolean);
         info.total = info.trackUris.length;
       }
@@ -887,6 +903,7 @@ async function updateContextLine(ctx, currentTrack){
     state.currentContextOwner = info.owner;
     state.currentContextTracks = info.trackUris || null;
   }
+  if(!isCurrent())return false;
   // Compute track N of M when applicable
   let posLabel = '';
   if(state.currentContextTracks && currentTrack){
@@ -903,6 +920,7 @@ async function updateContextLine(ctx, currentTrack){
   if(posEl) posEl.textContent = posLabel;
   if(el) el.style.display = 'block';
   updateContextSaveBtn();
+  return true;
 }
 
 function updateNowPlaying(data){
@@ -1870,9 +1888,18 @@ Object.assign(state,{
   sdkConnectPromise:null,
   sdkReadyPromise:null,
   sdkReadyResolve:null,
+  sdkReadyGeneration:0,
   sdkRebuildPromise:null,
   resumePromise:null,
+  resumeGeneration:0,
+  resumeStartedAt:0,
+  foregroundResumeTimer:null,
   needsSdkRecovery:false,
+  sdkDeviceUnconfirmed:false,
+  sdkGeneration:0,
+  sdkAuthRecoveryPromise:null,
+  authRefreshGeneration:0,
+  refreshStartedAt:0,
   confirmedVolume:80,
   lifecycleReason:'manual',
   activeDeviceName:null,
@@ -1961,14 +1988,27 @@ function loadSpotifySdk(options){
   return state.sdkScriptPromise;
 }
 function resolveSdkReady(value){
-  if(state.sdkReadyResolve){state.sdkReadyResolve(!!value);state.sdkReadyResolve=null;}
+  const resolve=state.sdkReadyResolve;
+  if(resolve)resolve(!!value);
 }
-function makeSdkReadyPromise(){
-  state.sdkReadyPromise=new Promise(function(resolve){
-    state.sdkReadyResolve=resolve;
-    setTimeout(function(){if(state.sdkReadyResolve){state.sdkReadyResolve(false);state.sdkReadyResolve=null;}},10000);
+function makeSdkReadyPromise(generation){
+  let finish;
+  let timeoutId;
+  const readyPromise=new Promise(function(resolve){
+    finish=function(value){
+      // Each player owns its resolver. A timeout from a disconnected player
+      // must never resolve the replacement player's readiness promise.
+      if(state.sdkReadyResolve!==finish)return;
+      clearTimeout(timeoutId);
+      state.sdkReadyResolve=null;
+      resolve(!!value);
+    };
+    state.sdkReadyResolve=finish;
+    timeoutId=setTimeout(function(){finish(false);},10000);
   });
-  return state.sdkReadyPromise;
+  state.sdkReadyGeneration=generation;
+  state.sdkReadyPromise=readyPromise;
+  return readyPromise;
 }
 function invalidateSdkDevice(reason,reportedId){
   const stale=state.cleanplayDeviceId;
@@ -1976,6 +2016,7 @@ function invalidateSdkDevice(reason,reportedId){
   state.sdkReady=false;
   state.sdkActivated=false;
   state.needsSdkRecovery=true;
+  state.sdkDeviceUnconfirmed=false;
   state.cleanplayDeviceId=null;
   if(state.activeDeviceId&&(state.activeDeviceId===stale||state.activeDeviceId===reportedId)){
     state.activeDeviceId=null;state.activeDeviceName=null;state.activeDeviceType=null;
@@ -1986,22 +2027,27 @@ function invalidateSdkDevice(reason,reportedId){
 function disconnectWebPlayer(){
   const player=state.webPlayer;
   const stale=state.cleanplayDeviceId;
+  state.sdkGeneration=(state.sdkGeneration||0)+1;
   if(stale)state.staleCleanplayDeviceId=stale;
   if(stale&&state.activeDeviceId===stale){state.activeDeviceId=null;state.activeDeviceName=null;state.activeDeviceType=null;}
   state.webPlayer=null;
   state.sdkReady=false;
   state.sdkActivated=false;
+  state.sdkDeviceUnconfirmed=false;
   state.cleanplayDeviceId=null;
   resolveSdkReady(false);
   if(player){try{player.disconnect();}catch{}}
 }
 function createWebPlayer(){
   if(state.webPlayer||!state.accessToken||!window.Spotify||!window.Spotify.Player)return state.webPlayer;
-  makeSdkReadyPromise();
+  const generation=(state.sdkGeneration||0)+1;
+  state.sdkGeneration=generation;
+  makeSdkReadyPromise(generation);
   const player=new Spotify.Player({
     name:'CleanPlay - this device',
     getOAuthToken:function(callback){
       Promise.resolve(ensureToken()).then(function(ok){
+        if(state.webPlayer!==player||state.sdkGeneration!==generation)return;
         if(ok&&state.accessToken)callback(state.accessToken);
         else noteDiagnostic('sdk','sdk_auth_error',{reason:'token_expired',target:'here',outcome:'degraded'});
       });
@@ -2009,13 +2055,16 @@ function createWebPlayer(){
     volume:0.8
   });
   state.webPlayer=player;
+  const isCurrentPlayer=function(){return state.webPlayer===player&&state.sdkGeneration===generation;};
   player.addListener('ready',function(payload){
+    if(!isCurrentPlayer())return;
     const oldId=state.cleanplayDeviceId;
     const staleId=state.staleCleanplayDeviceId;
     state.cleanplayDeviceId=payload.device_id;
     state.sdkReady=true;
     state.sdkAuthFailures=0;
     state.needsSdkRecovery=false;
+    state.sdkDeviceUnconfirmed=!isAppVisible();
     if(state.preferredTarget.kind==='here'||state.activeDeviceId&&(state.activeDeviceId===oldId||state.activeDeviceId===staleId)){
       state.activeDeviceId=payload.device_id;
       state.activeDeviceName='CleanPlay - this device';
@@ -2027,41 +2076,60 @@ function createWebPlayer(){
     setConnectionHealth('online','Ready','Spotify account connected. In-browser player is ready.');
     const pending=state.pendingPlaybackIntent;
     if(pending&&typeof pending.run==='function'){
-      state.pendingPlaybackIntent=null;
-      if(state.sdkActivated&&Date.now()-pending.createdAt<15000)Promise.resolve().then(pending.run);
-      else setConnectionHealth('recovering','Tap play again','This browser needs one fresh tap now that the player is ready.','Tap play once more to enable audio on this device.');
+      const age=Date.now()-pending.createdAt;
+      if(state.sdkActivated&&age<20000){
+        state.pendingPlaybackIntent=null;
+        Promise.resolve().then(pending.run);
+      }else if(age>=20000){
+        state.pendingPlaybackIntent=null;
+        setConnectionHealth('recovering','Tap play','The earlier playback request expired while this device was reconnecting.','Tap play to start audio on this device.');
+      }else{
+        // Keep the request. A fresh iOS gesture can activate this now-ready
+        // player and complete the same intent instead of losing it.
+        setConnectionHealth('recovering','Tap play','This device is reconnected and waiting for audio permission.','Tap play to start audio on this device.');
+      }
     }
   });
   player.addListener('not_ready',function(payload){
+    if(!isCurrentPlayer())return;
     invalidateSdkDevice('not_ready',payload&&payload.device_id);
     if(isAppVisible())setTimeout(function(){resumeSession('not_ready');},250);
   });
   player.addListener('authentication_error',function(){
+    if(!isCurrentPlayer())return;
     invalidateSdkDevice('auth');
     noteDiagnostic('sdk','sdk_auth_error',{reason:'auth',target:'here',outcome:'retry'});
-    state.sdkAuthFailures=(state.sdkAuthFailures||0)+1;
-    if(state.sdkAuthFailures>=2){
-      requireSpotifyReconnect('Spotify needs one fresh connection to restore in-browser playback permission. Your Listen Later list is still saved.');
-      return;
-    }
-    Promise.resolve(ensureToken(true)).then(function(ok){if(ok&&isAppVisible())rebuildWebPlayer('auth');});
+    let recovery;
+    recovery=Promise.resolve(refreshTokenFn('auth')).then(function(result){
+      if(!isCurrentPlayer())return;
+      if(result.status==='invalid_grant')return;
+      if(result.status==='success'&&isAppVisible())return rebuildWebPlayer('auth');
+      if(result.status==='transient')setConnectionHealth('recovering','Spotify reconnecting','Your sign-in was kept. Retry when the connection is stable.','Spotify is temporarily unreachable. Tap Retry to reconnect.');
+    }).finally(function(){if(state.sdkAuthRecoveryPromise===recovery)state.sdkAuthRecoveryPromise=null;});
+    // A newer player generation is allowed to supersede an older recovery.
+    state.sdkAuthRecoveryPromise=recovery;
   });
   player.addListener('initialization_error',function(){
+    if(!isCurrentPlayer())return;
     noteDiagnostic('sdk','sdk_connect',{reason:'manual',target:'here',outcome:'failed'});
     setConnectionHealth('error','Player unavailable','The browser player could not start. Remote Spotify devices remain available.','The in-browser player could not start.');
   });
   player.addListener('account_error',function(){
+    if(!isCurrentPlayer())return;
     setConnectionHealth('error','Premium needed','In-browser playback requires Spotify Premium. Remote control may still work.','Spotify Premium is needed for playback on this device.');
   });
   player.addListener('autoplay_failed',function(){
-    state.sdkActivated=false;state.pendingPlaybackIntent=null;
+    if(!isCurrentPlayer())return;
+    state.sdkActivated=false;
     noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
     setConnectionHealth('recovering','Tap play again','The browser blocked autoplay after the player changed.','Tap play once more to enable audio on this device.');
   });
   player.addListener('playback_error',function(){
+    if(!isCurrentPlayer())return;
     noteDiagnostic('playback','command_failed',{reason:'manual',target:'here',outcome:'failed'});
   });
   player.addListener('player_state_changed',function(sdkState){
+    if(!isCurrentPlayer())return;
     if(!sdkState){
       // A newly connected SDK device legitimately reports null until it has a
       // playback context. `not_ready` is the authoritative disconnect signal;
@@ -2076,6 +2144,7 @@ function createWebPlayer(){
   });
   noteDiagnostic('sdk','sdk_connect',{reason:state.lifecycleReason||'manual',target:'here',outcome:'retry'});
   state.sdkConnectPromise=Promise.resolve(player.connect()).then(function(success){
+    if(!isCurrentPlayer())return false;
     if(!success){
       disconnectWebPlayer();
       noteDiagnostic('sdk','sdk_connect',{reason:'manual',target:'here',outcome:'failed'});
@@ -2083,6 +2152,7 @@ function createWebPlayer(){
     }
     return true;
   }).catch(function(){
+    if(!isCurrentPlayer())return false;
     disconnectWebPlayer();
     noteDiagnostic('sdk','sdk_connect',{reason:'manual',target:'here',outcome:'failed'});
     return false;
@@ -2114,17 +2184,20 @@ function rebuildWebPlayerForGesture(){
 function activateSdkAudio(){
   const player=state.webPlayer;
   if(!player||typeof player.activateElement!=='function')return false;
+  const generation=state.sdkGeneration;
+  const isCurrent=function(){return state.webPlayer===player&&state.sdkGeneration===generation;};
   try{
     const activation=player.activateElement();
     state.sdkActivated=true;
     if(activation&&typeof activation.catch==='function'){
       activation.catch(function(){
+        if(!isCurrent())return;
         state.sdkActivated=false;
         noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
         setConnectionHealth('recovering','Tap play again','The browser did not enable audio on the first attempt.','Tap play once more to enable audio on this device.');
       });
     }
-    noteDiagnostic('lifecycle','visible',{reason:'gesture',target:'here',outcome:'ok'});
+    if(isCurrent())noteDiagnostic('lifecycle','visible',{reason:'gesture',target:'here',outcome:'ok'});
     return true;
   }catch{
     state.sdkActivated=false;
@@ -2132,23 +2205,28 @@ function activateSdkAudio(){
   }
 }
 
-async function reconcileDevices(){
+async function reconcileDevices(guard){
   const data=await api('/me/player/devices','GET',null,{silent:true});
+  if(typeof guard==='function'&&!guard())return false;
   if(!data||!Array.isArray(data.devices)){
     noteDiagnostic('recovery','device_reconcile',{reason:'device_missing',target:state.preferredTarget.kind,outcome:'degraded'});
     return false;
   }
   const devices=data.devices.filter(function(device){return !!(device&&device.id)&&device.is_restricted!==true;});
-  const localId=state.cleanplayDeviceId;
-  if(state.preferredTarget.kind==='here'){
-    const localListed=!!localId&&devices.some(function(device){return device.id===localId;});
-    if(state.sdkReady&&localId&&localListed){
-      state.activeDeviceId=localId;
+    const localId=state.cleanplayDeviceId;
+    if(state.preferredTarget.kind==='here'){
+      const localListed=!!localId&&devices.some(function(device){return device.id===localId;});
+      if(state.sdkReady&&localId&&localListed){
+        // Device discovery can briefly list a player that iOS silently killed.
+        // Do not let that listing clear the suspend marker; a current `ready`
+        // event or a successful visible command is stronger evidence.
+        state.activeDeviceId=localId;
       state.activeDeviceName='CleanPlay - this device';
       state.activeDeviceType='Computer';
       noteDiagnostic('recovery','device_reconcile',{reason:'wake',target:'here',outcome:'ok'});
       return true;
     }
+    if(state.sdkReady&&localId)state.sdkDeviceUnconfirmed=true;
     state.activeDeviceId=null;
     state.activeDeviceName=null;state.activeDeviceType=null;
     return false;
@@ -2176,24 +2254,46 @@ async function verifyIdentityFirst(){
   if(account)account.textContent=(me.display_name||'Spotify account')+(me.product?' - '+me.product:'');
   return true;
 }
-async function resumeSession(reason){
-  if(state.resumePromise)return state.resumePromise;
-  if(!isAppVisible())return false;
+function cancelResumeAttempt(){
+  state.resumeGeneration=(state.resumeGeneration||0)+1;
+  state.resumePromise=null;
+  state.resumeStartedAt=0;
+}
+function scheduleForegroundResume(reason){
+  clearTimeout(state.foregroundResumeTimer);
+  state.foregroundResumeTimer=setTimeout(function(){
+    state.foregroundResumeTimer=null;
+    if(isAppVisible())resumeSession(reason||'visible',{force:true});
+  },120);
+}
+function resumeSession(reason,options){
+  if(!isAppVisible())return Promise.resolve(false);
   reason=reason||'wake';
+  const force=!!(options&&options.force)||reason==='visible'||reason==='pageshow'||reason==='online'||reason==='banner';
+  if(state.resumePromise&&!force)return state.resumePromise;
+  if(state.resumePromise&&force)cancelResumeAttempt();
+  const generation=(state.resumeGeneration||0)+1;
+  state.resumeGeneration=generation;
+  state.resumeStartedAt=Date.now();
+  const isCurrentAttempt=function(){return state.resumeGeneration===generation&&isAppVisible();};
   state.lifecycleReason=reason;
   noteDiagnostic('lifecycle','resume_start',{reason:reason,target:state.preferredTarget.kind,outcome:'retry'});
   setConnectionHealth('recovering','Reconnecting','Refreshing the account, player, and device.','Restoring the Spotify connection...');
-  state.resumePromise=(async function(){
+  const attempt=(async function(){
     if(!navigator.onLine){
       noteDiagnostic('network','offline',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
       setConnectionHealth('offline','Offline','Listen Later remains available on this device.','You are offline. CleanPlay will retry when the connection returns.');
       return false;
     }
-    if(!await ensureToken()){
+    const tokenReady=await ensureToken();
+    if(!isCurrentAttempt())return false;
+    if(!tokenReady){
       noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
       return false;
     }
-    if(!await verifyIdentityFirst()){
+    const identityReady=await verifyIdentityFirst(isCurrentAttempt);
+    if(!isCurrentAttempt())return false;
+    if(!identityReady){
       noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
       setConnectionHealth('error','Spotify unreachable','Your sign-in was kept. CleanPlay will retry without signing you out.','Spotify is temporarily unreachable. Your sign-in is still saved.');
       return false;
@@ -2201,17 +2301,44 @@ async function resumeSession(reason){
     if(state.preferredTarget.kind==='here'){
       // `player_state_changed(null)` and getCurrentState() === null are normal
       // for a ready device with no playback context. Rebuild only after a real
-      // lifecycle/not_ready signal or when no ready SDK instance exists.
-      if(!state.webPlayer||state.needsSdkRecovery||!state.sdkReady)await rebuildWebPlayer(reason);
+      // lifecycle/not_ready signal. If a Play tap already created and activated
+      // a player, let that in-flight connection finish instead of replacing it
+      // with an unactivated instance and losing the user's gesture.
+      if(!state.webPlayer||state.needsSdkRecovery)await rebuildWebPlayer(reason);
+      else if(!state.sdkReady&&state.sdkReadyPromise){
+        const becameReady=await state.sdkReadyPromise;
+        if(!becameReady&&isCurrentAttempt())await rebuildWebPlayer(reason);
+      }else if(!state.sdkReady)await rebuildWebPlayer(reason);
     }else if(state.webPlayer)disconnectWebPlayer();
-    const deviceReady=await reconcileDevices();
+    if(!isCurrentAttempt())return false;
+    let deviceReady=await reconcileDevices(isCurrentAttempt);
+    if(!isCurrentAttempt())return false;
+    if(!deviceReady&&state.preferredTarget.kind==='here'&&state.sdkReady&&state.cleanplayDeviceId){
+      // Spotify's device list can lag a fresh SDK ready event. Probe once more;
+      // only then treat the device as silently lost and register a replacement.
+      await new Promise(function(resolve){setTimeout(resolve,450);});
+      if(!isCurrentAttempt())return false;
+      deviceReady=await reconcileDevices(isCurrentAttempt);
+      if(!deviceReady&&isCurrentAttempt()&&state.sdkReady&&state.cleanplayDeviceId){
+        // The SDK's current ready event is authoritative. Device discovery can
+        // lag on wake; preserve this player and let not_ready or a real command
+        // 404 trigger the bounded recovery path if it is actually gone.
+        state.activeDeviceId=state.cleanplayDeviceId;
+        state.activeDeviceName='CleanPlay - this device';
+        state.activeDeviceType='Computer';
+        state.sdkDeviceUnconfirmed=true;
+        noteDiagnostic('recovery','device_reconcile',{reason:'wake',target:'here',outcome:'ok'});
+        deviceReady=true;
+      }
+    }
     if(!deviceReady&&state.preferredTarget.kind==='remote'){
       // Warm only the SDK script. No browser device is created until a real
       // playback tap, preserving remote-first wake behavior while allowing that
       // tap to activate the local player synchronously on iOS.
       loadSpotifySdk({silent:true}).catch(function(){});
     }
-    const playbackReady=await fetchState();
+    const playbackReady=await fetchState(isCurrentAttempt);
+    if(!isCurrentAttempt())return false;
     startPolling();
     if(!playbackReady){
       noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
@@ -2222,12 +2349,29 @@ async function resumeSession(reason){
     if(deviceReady||state.currentTrackUri)setConnectionHealth('online','Connected','Spotify account and playback state are current.');
     else setConnectionHealth('online','Spotify connected','Start Spotify on a device, then choose it in CleanPlay.');
     return true;
-  })().catch(function(){
+  })();
+  let timeoutId=null;
+  const timeout=new Promise(function(resolve){
+    timeoutId=setTimeout(function(){
+      if(state.resumeGeneration!==generation){resolve(false);return;}
+      state.resumeGeneration+=1;
+      noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
+      setConnectionHealth('recovering','Reconnect ready','The previous recovery attempt timed out. Tap Retry to start a fresh one.','The connection check timed out. Tap Retry.');
+      resolve(false);
+    },15000);
+  });
+  let tracked;
+  tracked=Promise.race([attempt,timeout]).catch(function(){
+    if(state.resumeGeneration!==generation)return false;
     noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
     setConnectionHealth('error','Connection paused','Your sign-in was kept. Retry when the network is stable.','CleanPlay could not finish reconnecting. Your sign-in is still saved.');
     return false;
-  }).finally(function(){state.resumePromise=null;});
-  return state.resumePromise;
+  }).finally(function(){
+    clearTimeout(timeoutId);
+    if(state.resumePromise===tracked){state.resumePromise=null;state.resumeStartedAt=0;}
+  });
+  state.resumePromise=tracked;
+  return tracked;
 }
 function showApp(){
   document.getElementById('setup').style.display='none';
@@ -2252,7 +2396,7 @@ async function playHere(){
   }
 
   if(!state.webPlayer)createWebPlayer();
-  else if(state.needsSdkRecovery)rebuildWebPlayerForGesture();
+  else if(state.needsSdkRecovery||state.sdkDeviceUnconfirmed)rebuildWebPlayerForGesture();
   activateSdkAudio();
 
   if(!state.sdkReady&&state.sdkReadyPromise){
@@ -2305,9 +2449,13 @@ async function playerCommand(command,requestFactory){
     }
   }
   for(let attempt=0;attempt<2;attempt++){
+    const commandStartedVisible=isAppVisible();
+    const commandSdkGeneration=state.sdkGeneration;
+    const commandDeviceId=state.activeDeviceId;
     const request=requestFactory(),failure={};
     const result=await api(request.path,request.method||'PUT',request.body===undefined?null:request.body,{silent:true,failureSink:failure});
     if(result!==null){
+      if(commandStartedVisible&&isAppVisible()&&commandSdkGeneration===state.sdkGeneration&&commandDeviceId===state.cleanplayDeviceId)state.sdkDeviceUnconfirmed=false;
       noteDiagnostic('playback','command_ok',{attempt:attempt,target:playbackTargetKind(),outcome:'ok'});
       if(attempt)setConnectionHealth('online','Connected','Playback recovered on the selected device.');
       return true;
@@ -2342,18 +2490,30 @@ function preparePlaybackIntent(label,run){
     }
     return false;
   }
+  if(state.needsSdkRecovery||state.sdkDeviceUnconfirmed){
+    // A post-lock tap must replace a stale or undiscoverable player *before*
+    // trusting its old ready/device flags. Queue first so the replacement ready
+    // event can finish this same gesture's request automatically.
+    state.pendingPlaybackIntent={label:label,run:run,createdAt:Date.now()};
+    if(window.Spotify&&window.Spotify.Player){
+      const replacement=rebuildWebPlayerForGesture();
+      if(replacement)state.needsSdkRecovery=false;
+    }else initWebPlayer();
+    noteDiagnostic('recovery','command_retry',{reason:'gesture',target:'here',outcome:'retry'});
+    setConnectionHealth('recovering','Waking player','Your request will start when this device is ready.','Reconnecting this device and starting your selection...');
+    return true;
+  }
   if(state.sdkReady&&state.cleanplayDeviceId){
     state.activeDeviceId=state.cleanplayDeviceId;
     state.activeDeviceName='CleanPlay - this device';
     state.activeDeviceType='Computer';
     activateSdkAudio();
+    state.pendingPlaybackIntent=null;
     return false;
   }
   state.pendingPlaybackIntent={label:label,run:run,createdAt:Date.now()};
   if(window.Spotify&&window.Spotify.Player){
     if(!state.webPlayer)createWebPlayer();
-    else if(state.needsSdkRecovery)rebuildWebPlayerForGesture();
-    state.needsSdkRecovery=false;
     activateSdkAudio();
   }else initWebPlayer();
   noteDiagnostic('recovery','command_retry',{reason:'gesture',target:'here',outcome:'retry'});
@@ -2880,6 +3040,23 @@ function updateHealthSummary(status){return status?updateConnectionHealth(status
 function authDiagnostic(event,fields){
   if(typeof logDiagnostic==='function')logDiagnostic(event,{category:'auth',...(fields||{})});
 }
+function fetchWithTimeout(input,init,timeoutMs){
+  const options={...(init||{})};
+  if(typeof AbortController==='undefined')return fetch(input,options);
+  const controller=new AbortController();
+  const upstream=options.signal;
+  const abortFromUpstream=function(){controller.abort();};
+  if(upstream){
+    if(upstream.aborted)controller.abort();
+    else upstream.addEventListener('abort',abortFromUpstream,{once:true});
+  }
+  options.signal=controller.signal;
+  const timeout=setTimeout(function(){controller.abort();},Math.max(1000,Number(timeoutMs)||12000));
+  return fetch(input,options).finally(function(){
+    clearTimeout(timeout);
+    if(upstream)upstream.removeEventListener('abort',abortFromUpstream);
+  });
+}
 function timingSafeTokenEqual(left,right){
   const a=new TextEncoder().encode(String(left||'')),b=new TextEncoder().encode(String(right||''));
   let diff=a.length^b.length;
@@ -2909,6 +3086,11 @@ function endAuthorizedSession(){
   state.sleepTimerEnd=0;
   state._sleepExpiredPending=false;
   state._authEpoch=(state._authEpoch||0)+1;
+  state.authRefreshGeneration=(state.authRefreshGeneration||0)+1;
+  state._refreshPromise=null;
+  state.refreshStartedAt=0;
+  state.sdkAuthRecoveryPromise=null;
+  if(typeof cancelResumeAttempt==='function')cancelResumeAttempt();
   try{localStorage.removeItem(KEYS.sleepTimerEnd);}catch{}
   if(typeof disconnectWebPlayer==='function')disconnectWebPlayer();
   else if(state.webPlayer){try{state.webPlayer.disconnect();}catch{}state.webPlayer=null;}
@@ -2964,7 +3146,7 @@ async function handleAuthCallback(){
   }
   state.clientId=clientId;setAuthStatus('Finishing secure sign-in...');
   try{
-    const response=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:REDIRECT_URI,client_id:clientId,code_verifier:verifier})});
+    const response=await fetchWithTimeout('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:REDIRECT_URI,client_id:clientId,code_verifier:verifier})},15000);
     if(!response.ok)throw new Error('oauth_exchange_failed');
     const tokenData=await response.json();
     saveTokens(tokenData,Date.now());
@@ -2996,9 +3178,19 @@ function saveTokens(data,authorizationIssuedAt){
   }
 }
 function refreshTokenFn(reason='token_expired'){
-  if(state._refreshPromise)return state._refreshPromise;
+  const now=Date.now();
+  if(state._refreshPromise&&now-(state.refreshStartedAt||0)<12000)return state._refreshPromise;
+  if(state._refreshPromise){
+    // iOS may freeze a token request while hidden. Supersede an overdue one;
+    // its generation guard prevents a late response overwriting fresh tokens.
+    state.authRefreshGeneration=(state.authRefreshGeneration||0)+1;
+    state._refreshPromise=null;
+  }
+  const refreshGeneration=(state.authRefreshGeneration||0)+1;
+  state.authRefreshGeneration=refreshGeneration;
+  state.refreshStartedAt=now;
   const refreshEpoch=state._authEpoch||0;
-  state._refreshPromise=(async function(){
+  const refreshWork=(async function(){
     authDiagnostic('refresh_start',{reason:reason,outcome:'retry'});
     if(!state.refreshToken||!state.clientId){
       authDiagnostic('refresh_invalid',{reason:'auth',outcome:'failed'});
@@ -3010,8 +3202,9 @@ function refreshTokenFn(reason='token_expired'){
       return {status:'transient',reason:'offline'};
     }
     try{
-      const response=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:state.refreshToken,client_id:state.clientId})});
+      const response=await fetchWithTimeout('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:state.refreshToken,client_id:state.clientId})},12000);
       let data={};try{data=await response.json();}catch{}
+      if(refreshGeneration!==state.authRefreshGeneration)return {status:'transient',reason:'cancelled'};
       if(response.ok&&data.access_token){
         if(refreshEpoch!==(state._authEpoch||0))return {status:'transient',reason:'cancelled'};
         saveTokens(data);authDiagnostic('refresh_ok',{status:response.status,reason:reason,outcome:'ok'});
@@ -3025,11 +3218,17 @@ function refreshTokenFn(reason='token_expired'){
       authDiagnostic('refresh_transient',{status:response.status,reason:reason,outcome:'degraded'});
       return {status:'transient',reason:response.status>=500||response.status===429?'server':'oauth_response',httpStatus:response.status};
     }catch{
+      if(refreshGeneration!==state.authRefreshGeneration)return {status:'transient',reason:'cancelled'};
       authDiagnostic('refresh_transient',{reason:reason,outcome:'degraded'});
       return {status:'transient',reason:navigator.onLine===false?'offline':'network'};
     }
-  })().finally(function(){state._refreshPromise=null;});
-  return state._refreshPromise;
+  })();
+  let tracked;
+  tracked=refreshWork.finally(function(){
+    if(state._refreshPromise===tracked){state._refreshPromise=null;state.refreshStartedAt=0;}
+  });
+  state._refreshPromise=tracked;
+  return tracked;
 }
 async function ensureToken(options){
   const opts=options===true?{force:true}:options&&typeof options==='object'?options:{};
@@ -3039,8 +3238,9 @@ async function ensureToken(options){
 }
 
 // ==== CLEANPLAY V3: RESILIENT AUTH OVERRIDES (2/2) ===========================
-async function verifyUser(){
+async function verifyUser(guard){
   const me=await api('/me','GET',null,{silent:true});
+  if(typeof guard==='function'&&!guard())return false;
   if(!me){
     if(state.refreshToken)setAuthStatus('Spotify could not verify the account right now. Your sign-in is still saved.','error');
     return false;
@@ -3062,7 +3262,7 @@ async function verifyUser(){
   state.user={account_id:accountId||null,id:legacyId||null,display_name:me.display_name||'',product:me.product||''};
   return true;
 }
-function verifyIdentityFirst(){return verifyUser();}
+function verifyIdentityFirst(guard){return verifyUser(guard);}
 async function api(path,method='GET',body=null,callerOpts){
   const options=callerOpts&&typeof callerOpts==='object'?callerOpts:{},silent=!!options.silent,failureSink=options.failureSink;
   const fail=function(status,reason){
@@ -3076,7 +3276,7 @@ async function api(path,method='GET',body=null,callerOpts){
   const request={method:method,headers:{Authorization:'Bearer '+state.accessToken}};
   if(body){request.headers['Content-Type']='application/json';request.body=JSON.stringify(body);}
   try{
-    const response=await fetch('https://api.spotify.com/v1'+path,request);
+    const response=await fetchWithTimeout('https://api.spotify.com/v1'+path,request,12000);
     if(response.status===401){
       fail(401,'auth');
       if(typeof logDiagnostic==='function')logDiagnostic('api_error',{category:'api',status:401,reason:'auth',attempt:options._retried?2:1,outcome:options._retried?'failed':'retry'});
@@ -3175,25 +3375,36 @@ async function decideNextScreen(){
   showSetup();
 }
 
+function markSdkDeviceUnconfirmedOnSuspend(){
+  // A ready event can be delivered while iOS is locking or restoring the PWA.
+  // Keep the current player alive for uninterrupted audio, but require the next
+  // foreground playback gesture to register a fresh Spotify device first.
+  if(state.sdkReady&&state.cleanplayDeviceId)state.sdkDeviceUnconfirmed=true;
+}
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='hidden'){
     stopPolling();
-    state.needsSdkRecovery=true;
+    // Do not interrupt audio merely because the screen locked. Keep the player
+    // alive, then use the next playback tap to re-register it if necessary.
+    markSdkDeviceUnconfirmedOnSuspend();
+    cancelResumeAttempt();
     noteDiagnostic('lifecycle','hidden',{reason:'wake',target:state.preferredTarget.kind,outcome:'degraded'});
     setConnectionHealth('recovering','Paused','CleanPlay will refresh when you return.');
   }else{
     noteDiagnostic('lifecycle','visible',{reason:'visible',target:state.preferredTarget.kind,outcome:'retry'});
-    resumeSession('visible');
+    scheduleForegroundResume('visible');
   }
 });
 window.addEventListener('pagehide',function(){
   stopPolling();
-  state.needsSdkRecovery=true;
+  markSdkDeviceUnconfirmedOnSuspend();
+  cancelResumeAttempt();
 });
 window.addEventListener('pageshow',function(){
   noteDiagnostic('lifecycle','pageshow',{reason:'pageshow',target:state.preferredTarget.kind,outcome:'retry'});
-  resumeSession('pageshow');
+  scheduleForegroundResume('pageshow');
 });
+window.addEventListener('focus',function(){scheduleForegroundResume('visible');});
 window.addEventListener('offline',function(){
   stopPolling();
   noteDiagnostic('network','offline',{reason:'wake',target:state.preferredTarget.kind,outcome:'degraded'});
@@ -3201,7 +3412,7 @@ window.addEventListener('offline',function(){
 });
 window.addEventListener('online',function(){
   noteDiagnostic('network','online',{reason:'online',target:state.preferredTarget.kind,outcome:'retry'});
-  resumeSession('online');
+  scheduleForegroundResume('online');
 });
 
 function registerServiceWorker(){
