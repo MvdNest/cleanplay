@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">CleanPlay</title>
+  <desc id="description">A gold C monogram on a charcoal background.</desc>
+  <rect width="512" height="512" fill="#0d0d0e"/>
+  <circle cx="256" cy="256" r="214" fill="#131312" stroke="#2a2a30" stroke-width="4"/>
+  <path
+    d="M355 166 C329 139 296 124 257 124 C181 124 125 180 125 256 C125 332 181 388 257 388 C296 388 329 373 355 346"
+    fill="none"
+    stroke="#d4a449"
+    stroke-width="54"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

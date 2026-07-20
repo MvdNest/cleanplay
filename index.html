@@ -2,22 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="description" content="A text-only Spotify controller. No album art, no images, ever.">
-<meta name="theme-color" content="#0d0d0e">
+<meta name="theme-color" content="#0d0d0e" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="CleanPlay">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="format-detection" content="telephone=no">
 <title>CleanPlay — text only</title>
-<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%230d0d0e' rx='12'/><text x='32' y='44' font-family='Georgia,serif' font-size='38' font-style='italic' fill='%23d4a449' text-anchor='middle'>C</text></svg>">
-<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%230d0d0e' rx='38'/><text x='90' y='124' font-family='Georgia,serif' font-size='108' font-style='italic' fill='%23d4a449' text-anchor='middle'>C</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=JetBrains+Mono:wght@300;400;500;600&family=Inter+Tight:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png">
 <style>
-:root{--bg:#0d0d0e;--bg-warm:#131312;--surface:#18181b;--surface-2:#1f1f23;--border:#2a2a30;--border-soft:#1f1f25;--text:#f4f4ec;--text-soft:#c4c4bc;--muted:#6f6f76;--muted-dim:#4a4a50;--accent:#d4a449;--accent-bright:#e8b659;--accent-dim:#8a6a2c;--accent-soft:rgba(212,164,73,0.12);--danger:#d96666;--success:#6fb88c;--serif:'Fraunces','Georgia',serif;--sans:'Inter Tight',system-ui,sans-serif;--mono:'JetBrains Mono','SF Mono',monospace;--max-width:1280px;--sidebar-width:240px;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+:root{--bg:#0d0d0e;--bg-warm:#131312;--surface:#19191b;--surface-2:#222225;--border:#343438;--border-soft:#242428;--text:#f7f5ee;--text-soft:#d0cec6;--muted:#929198;--muted-dim:#626168;--accent:#d9ad5b;--accent-bright:#efc875;--accent-dim:#92733a;--accent-soft:rgba(217,173,91,0.13);--danger:#ef8585;--success:#80c99b;--serif:ui-serif,'New York','Iowan Old Style','Palatino Linotype',Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;--mono:ui-monospace,'SFMono-Regular','SF Mono',Menlo,Consolas,monospace;--max-width:1280px;--sidebar-width:240px;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
 body{background:radial-gradient(ellipse at top,rgba(212,164,73,0.04),transparent 50%),radial-gradient(ellipse at bottom right,rgba(212,164,73,0.02),transparent 50%),var(--bg);background-attachment:fixed;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
@@ -48,7 +47,7 @@ input,textarea{font-family:inherit}
 .copy-btn.copied{color:var(--success);border-color:var(--success)}
 .field{display:flex;flex-direction:column;gap:6px;margin-top:14px}
 .field-label{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:2px}
-.field input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:14px 16px;font-family:var(--mono);font-size:13px;border-radius:6px;outline:none;transition:border-color 0.2s}
+.field input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:14px 16px;font-family:var(--mono);font-size:16px;border-radius:6px;outline:none;transition:border-color 0.2s}
 .field input:focus{border-color:var(--accent)}
 .field input::placeholder{color:var(--muted-dim)}
 .note{background:var(--surface);border-left:3px solid var(--accent-dim);padding:12px 16px;font-size:12px;color:var(--text-soft);line-height:1.6;border-radius:0 4px 4px 0;font-family:var(--mono);margin-top:12px}
@@ -117,7 +116,7 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .view-title{font-family:var(--serif);font-style:italic;font-size:32px;color:var(--text);font-weight:500;margin-bottom:16px;letter-spacing:-0.5px}
 .search-box{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:border-color 0.2s}
 .search-box:focus-within{border-color:var(--accent)}
-.search-box input{flex:1;background:transparent;border:none;color:var(--text);padding:14px 16px;font-family:var(--sans);font-size:15px;outline:none}
+.search-box input{flex:1;background:transparent;border:none;color:var(--text);padding:14px 16px;font-family:var(--sans);font-size:16px;outline:none}
 .search-box input::placeholder{color:var(--muted)}
 .search-box button{background:transparent;border:none;color:var(--accent);padding:0 18px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;border-left:1px solid var(--border)}
 .search-box button:hover{background:var(--accent-soft)}
@@ -148,6 +147,7 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .icon-btn svg{width:16px;height:16px;fill:currentColor;display:block}
 .icon-btn:hover{color:var(--accent);background:var(--surface-2)}
 .icon-btn:active{transform:scale(0.92)}
+.icon-btn.saved{color:var(--accent);background:var(--accent-soft)}
 .heart-btn svg path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
 .heart-btn.liked svg path{fill:currentColor;stroke:none}
 .heart-btn.liked{color:var(--accent)}
@@ -251,7 +251,69 @@ input[type="range"]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;b
 .sh-chip:hover{color:var(--accent);border-color:var(--accent-dim)}
 .sh-clear{background:none;border:none;color:var(--muted-dim);font-size:14px;padding:2px 6px}
 .sh-clear:hover{color:var(--danger)}
-button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);outline-offset:2px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent-bright);outline-offset:3px}
+button{min-height:44px}
+body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
+.header{min-height:58px;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));box-shadow:0 1px 0 rgba(255,255,255,.015)}
+.header-brand{letter-spacing:-.8px}
+.header-status{min-width:0}
+.status-chip{min-height:44px;max-width:58vw;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:999px;background:rgba(25,25,27,.8);color:var(--text-soft);font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.status-chip:active{background:var(--surface-2)}
+.status-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.connection-banner{display:none;align-items:flex-start;justify-content:space-between;gap:14px;padding:10px max(20px,env(safe-area-inset-right)) 10px max(20px,env(safe-area-inset-left));background:#171712;border-bottom:1px solid var(--accent-dim);color:var(--text-soft);font-size:12px;line-height:1.45}
+.connection-banner.show{display:flex}
+.connection-banner.error{background:#211516;border-bottom-color:var(--danger)}
+.connection-banner button{min-height:44px;padding:2px 8px;background:transparent;border:0;color:var(--accent);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.np-save-row{display:flex;align-items:center;gap:8px;margin-top:18px}
+.save-btn{min-height:44px;display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text-soft);font-size:12px;font-weight:600}
+.save-btn .save-mark{font-family:var(--mono);color:var(--accent);font-size:16px;line-height:1}
+.save-btn.saved{border-color:var(--accent-dim);background:var(--accent-soft);color:var(--accent-bright)}
+.saved-toolbar{padding:0 24px 16px;border-bottom:1px solid var(--border-soft)}
+.saved-intro{max-width:620px;margin-bottom:12px;color:var(--text-soft);font-size:13px}
+.saved-filters{display:flex;gap:7px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+.saved-filters::-webkit-scrollbar{display:none}
+.saved-filter{min-height:44px;white-space:nowrap;padding:7px 13px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase}
+.saved-filter.active{background:var(--accent-soft);border-color:var(--accent-dim);color:var(--accent-bright)}
+.saved-empty{margin:12px 24px 20px;padding:20px;border:1px dashed var(--border);border-radius:12px;color:var(--muted);font-size:13px}
+.library-divider{height:1px;margin:28px 24px 0;background:linear-gradient(90deg,var(--border),transparent)}
+.item{min-height:68px}
+.item-actions{gap:0}
+.icon-btn{min-width:44px;min-height:44px;padding:10px}
+.item-remove{color:var(--muted)}
+.item-remove:hover{color:var(--danger)}
+.settings-group-title{padding:28px 24px 8px;color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:2.5px;text-transform:uppercase}
+.health-card{margin:14px 24px;padding:16px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(145deg,var(--surface),rgba(25,25,27,.5))}
+.health-line{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text-soft)}
+.health-line .status-dot{flex:0 0 auto}
+.health-detail{margin-top:7px;color:var(--muted);font-family:var(--mono);font-size:10px;line-height:1.6}
+.diag-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.diag-preview{max-height:220px;overflow:auto;margin-top:12px;padding:12px;background:var(--bg);border:1px solid var(--border-soft);border-radius:8px;color:var(--muted);font:10px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word}
+.privacy-note{padding:10px 24px 24px;color:var(--muted);font-size:11px;line-height:1.6}
+.progress-bar{min-height:30px;background:linear-gradient(var(--border),var(--border)) center/100% 5px no-repeat}
+.progress-fill{margin-top:12.5px}
+.ctrl,.tab,.device-bar button,.detail-back,.up-next-link{touch-action:manipulation}
+.modal{box-shadow:0 -20px 60px rgba(0,0,0,.45)}
+.toast{top:calc(68px + var(--safe-top));border-radius:999px}
+[aria-busy="true"]{cursor:progress}
+@media(max-width:600px){
+  .setup-wrap{padding:32px 20px calc(90px + var(--safe-bottom))}
+  .setup-header{margin-bottom:38px}
+  .setup-brand{font-size:48px}
+  .np-container{padding:28px 20px 20px}
+  .np-track{font-size:clamp(30px,10vw,42px);line-height:1.04}
+  .progress-area,.volume-row,.device-bar,.up-next-section{padding-left:20px;padding-right:20px}
+  .view-header{padding:26px 20px 16px}
+  .view-title{font-size:34px}
+  .item{padding:12px 16px;gap:11px}
+  .item-num{width:20px}
+  .item-duration{display:none}
+  .tabs{padding-top:5px}
+  .tab{min-height:58px;padding:6px 2px}
+  .tab-label{font-size:8px;letter-spacing:.9px}
+  .settings-row{padding:15px 20px}
+  .saved-toolbar{padding-left:20px;padding-right:20px}
+}
+@media(display-mode:standalone){.header{padding-top:14px}.view{padding-bottom:calc(96px + var(--safe-bottom))}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}
 @media (min-width:1024px){
   .header{padding:16px 32px}
@@ -273,7 +335,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
   .list-section{padding:24px 48px 8px}
   .empty{padding:80px 24px}
 }
-@media (display-mode:standalone){.header{padding-top:calc(14px + var(--safe-top))}}
 </style>
 </head>
 <body>
@@ -314,13 +375,12 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
     </div>
   </div>
   <div class="setup-step">
-    <div class="step-num">Step 03 — recommended</div>
-    <h2>Lock to your Spotify account</h2>
-    <p>The strongest security layer. After login, the app verifies the Spotify user matches yours exactly. Even if someone got past the password and your dev app, they couldn't use it with a different account.</p>
-    <p>Find your username at <a href="https://www.spotify.com/account/overview/" target="_blank" rel="noopener">spotify.com/account</a> — look for "Username".</p>
-    <div class="field">
-      <span class="field-label">Your Spotify Username (recommended)</span>
-      <input type="text" id="user-id-input" placeholder="e.g. marnusvandernest" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="step-num">Step 03 - account lock</div>
+    <h2>Lock to the first account</h2>
+    <p>Leave this blank and CleanPlay will automatically lock itself to the first Spotify account that connects successfully.</p>
+    <p>Advanced: if you already know your Spotify Web API user ID, enter it below. This is the long account ID returned by the API, not the friendly username shown on spotify.com.</p>    <div class="field">
+      <span class="field-label">Spotify API user / account ID (advanced, optional)</span>
+      <input type="text" id="user-id-input" placeholder="Leave blank for automatic first-account lock" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
     </div>
   </div>
   <button class="btn-primary" onclick="startAuth()">Connect to Spotify →</button>
@@ -331,12 +391,18 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
   <header class="header">
     <div class="header-brand">CleanPlay</div>
     <div class="header-status">
-      <span id="user-display"></span>
-      <span class="status-dot" id="status-dot"></span>
+      <button class="status-chip" type="button" onclick="switchView('settings')" aria-label="Open connection settings">
+        <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+        <span class="status-text" id="connection-status" role="status" aria-live="polite">Connecting</span>
+      </button>
     </div>
   </header>
+  <div class="connection-banner" id="connection-banner" role="status" aria-live="polite">
+    <span id="connection-banner-text">Restoring your session...</span>
+    <button type="button" onclick="resumeSession('banner')">Retry</button>
+  </div>
   <div class="main">
-    <nav class="tabs">
+    <nav class="tabs" aria-label="Primary navigation">
       <button class="tab active" data-view="now-playing" onclick="switchView('now-playing')">
         <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span class="tab-label">Now Playing</span>
       </button>
@@ -344,7 +410,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
         <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 13 16h.5l.27.28v.79l5 4.99L20.49 21l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg><span class="tab-label">Search</span>
       </button>
       <button class="tab" data-view="library" onclick="switchView('library')">
-        <svg viewBox="0 0 24 24"><path d="M4 6h2v14H4zm14 0h2v14h-2zM8 6h8v14H8z"/></svg><span class="tab-label">Library</span>
+        <svg viewBox="0 0 24 24"><path d="M4 6h2v14H4zm14 0h2v14h-2zM8 6h8v14H8z"/></svg><span class="tab-label">Saved</span>
       </button>
       <button class="tab" data-view="queue" onclick="switchView('queue')">
         <svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg><span class="tab-label">Queue</span>
@@ -371,7 +437,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
           <div id="np-info" style="display:none">
             <div class="np-track" id="np-track">—</div>
             <div class="np-artist" id="np-artist">—</div>
-            <div class="np-album" id="np-album">—</div>
+            <div class="np-album" id="np-album">-</div>
+            <div class="np-save-row"><button class="save-btn" id="np-save" type="button" onclick="toggleNowPlayingSave()" aria-pressed="false"><span class="save-mark" aria-hidden="true">+</span><span id="np-save-label">Listen later</span></button></div>
             <div class="np-context" id="np-context" style="display:none">from <span class="ctx-link" id="np-context-link"></span><button class="ctx-save-btn" id="np-ctx-save" onclick="toggleContextSave()" title="Save"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></button><span class="ctx-pos" id="np-context-pos"></span></div>
             <div class="lyrics-section" id="lyrics-section" style="display:none">
               <button class="lyrics-toggle" id="lyrics-toggle" onclick="toggleLyrics()">▼ Lyrics</button>
@@ -392,7 +459,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
         </div>
         <div class="volume-row">
           <span class="vol-label">VOL</span>
-          <input type="range" id="volume-slider" min="0" max="100" value="80" oninput="setVolume(this.value)">
+          <input type="range" id="volume-slider" min="0" max="100" value="80" oninput="setVolume(this.value)" disabled aria-label="Volume unavailable until Spotify connects">
           <span class="vol-pct" id="vol-pct">80</span>
         </div>
         <div class="device-bar">
@@ -425,8 +492,21 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
         <div id="search-results"><div class="empty"><div class="empty-art">~</div>search anything · zero images returned</div></div>
       </section>
       <section class="view" id="view-library">
-        <div class="view-header"><h1 class="view-title">Library</h1></div>
-        <div id="library-list"><div class="empty"><div class="empty-art">⋯</div>loading…</div></div>
+        <div class="view-header"><h1 class="view-title">Listen Later</h1></div>
+        <div class="saved-toolbar">
+          <p class="saved-intro">A private list kept on this device. Save tracks, albums, artists, and playlists without changing your Spotify library.</p>
+          <div class="saved-filters" role="group" aria-label="Filter Listen Later">
+            <button class="saved-filter active" data-saved-filter="all" onclick="setSavedFilter('all')">All</button>
+            <button class="saved-filter" data-saved-filter="track" onclick="setSavedFilter('track')">Tracks</button>
+            <button class="saved-filter" data-saved-filter="album" onclick="setSavedFilter('album')">Albums</button>
+            <button class="saved-filter" data-saved-filter="artist" onclick="setSavedFilter('artist')">Artists</button>
+            <button class="saved-filter" data-saved-filter="playlist" onclick="setSavedFilter('playlist')">Playlists</button>
+          </div>
+        </div>
+        <div id="saved-local-list"></div>
+        <div class="library-divider" aria-hidden="true"></div>
+        <div class="list-section"><div class="list-section-title">Spotify library</div></div>
+        <div id="library-list"><div class="empty"><div class="empty-art">...</div>loading...</div></div>
       </section>
       <section class="view" id="view-queue">
         <div class="view-header"><h1 class="view-title">Queue</h1></div>
@@ -462,11 +542,26 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
             <div class="settings-info"><div class="settings-label">Sign out</div><div class="settings-detail">Clears tokens, returns to setup</div></div>
             <button class="btn-ghost" onclick="signOut()">Sign out</button>
           </div>
-          <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">iPhone lock screen</div><div class="settings-detail">When playing in-browser (▶ Here), iOS shows Spotify's embedded player instead of the track — a Spotify SDK limitation with no workaround. Playing on the Spotify app (with CleanPlay as remote) shows full info, but with album art.</div></div>
+          <div class="settings-group-title">Connection health</div>
+          <div class="health-card">
+            <div class="health-line"><span class="status-dot" id="health-dot" aria-hidden="true"></span><span id="health-summary" role="status">Checking connection...</span></div>
+            <div class="health-detail" id="health-detail">Spotify account, player, and network status will appear here.</div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay · v2.2 · text only · no images, ever</div></div>
+            <div class="settings-info"><div class="settings-label">Private diagnostics</div><div class="settings-detail">Recent connection events stay on this device. Tokens, full IDs, email addresses, searches, and music names are never recorded.</div>
+              <div class="diag-actions"><button class="btn-ghost" type="button" onclick="copyDiagnostics()">Copy</button><button class="btn-ghost" type="button" onclick="clearDiagnostics()">Clear</button></div>
+              <pre class="diag-preview" id="diag-preview" aria-label="Recent redacted diagnostics">No diagnostics yet.</pre>
+            </div>
+          </div>
+          <div class="privacy-note">If a wake-up problem returns, copy this log before signing out. It is intentionally redacted and capped on this phone.</div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">Artwork boundary</div><div class="settings-detail">CleanPlay never loads or displays artwork. Spotify or iOS may still show Spotify-owned artwork outside CleanPlay when playback is delegated to the Spotify app; a web controller cannot suppress another app's lock-screen artwork.</div></div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.0 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -474,15 +569,15 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-devices" onclick="if(event.target===this)closeModal()">
+<div class="modal-overlay" id="modal-devices" role="dialog" aria-modal="true" aria-labelledby="devices-title" onclick="if(event.target===this)closeModal()">
   <div class="modal">
-    <div class="modal-header"><div class="modal-title">Devices</div><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-header"><div class="modal-title" id="devices-title">Devices</div><button class="modal-close" onclick="closeModal()">×</button></div>
     <div class="modal-content" id="device-list-content"><div class="empty"><span class="spinner"></span>loading devices…</div></div>
   </div>
 </div>
-<div class="modal-overlay" id="modal-sleep-timer" onclick="if(event.target===this)closeModal()">
+<div class="modal-overlay" id="modal-sleep-timer" role="dialog" aria-modal="true" aria-labelledby="sleep-title" onclick="if(event.target===this)closeModal()">
   <div class="modal">
-    <div class="modal-header"><div class="modal-title">Sleep Timer</div><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-header"><div class="modal-title" id="sleep-title">Sleep Timer</div><button class="modal-close" onclick="closeModal()">×</button></div>
     <div class="modal-content">
       <div class="timer-options">
         <button class="timer-btn" onclick="setSleepTimer(0)">Off</button>
@@ -495,21 +590,19 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-dim);out
     </div>
   </div>
 </div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>
 window.onSpotifyWebPlaybackSDKReady = function(){ window._sdkReady = true; if(typeof createWebPlayer === 'function') createWebPlayer(); };
 </script>
-<script src="https://sdk.scdn.co/spotify-player.js"></script>
+<!-- Spotify Web Playback SDK is loaded only after authentication. -->
 <script>
 'use strict';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
-// Scopes are deliberately limited to the endpoints CleanPlay actually calls in dev mode.
-// Liking tracks, saving albums, and following artists are blocked by Spotify dev-mode policy
-// regardless of scope — those scopes have been removed since the corresponding UI was retired.
-const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','playlist-modify-private','user-read-email','user-read-private','streaming'].join(' ');
-const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',codeVerifier:'cp_code_verifier',recentQueued:'cp_recent_queued',lastPlayed:'cp_last_played',searchHistory:'cp_search_history'};
+// Scopes are limited to playback, library reading, private playlists, and in-browser streaming.
+// Profile email is deliberately not requested or displayed.
+const SCOPES = ['user-read-playback-state','user-modify-playback-state','user-read-currently-playing','user-read-recently-played','user-library-read','playlist-read-private','playlist-read-collaborative','user-read-private','streaming'].join(' ');
+const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',authIssuedAt:'cp_auth_issued_at',codeVerifier:'cp_code_verifier',oauthState:'cp_oauth_state',recentQueued:'cp_recent_queued',lastPlayed:'cp_last_played',searchHistory:'cp_search_history'};
 let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false,currentTrackId:null,currentTrackUri:null,currentContextUri:null,currentContextType:null,currentContextName:null,currentContextOwner:null,currentContextTracks:null,detail:null,prevView:'now-playing'};
-const followedPlaylistSet = new Set(); // playlist IDs in /me/playlists (owned or followed)
 const contextNameCache = new Map();   // uri -> {name, owner, tracks?}
 const lyricsCache = new Map();        // trackId -> {found, plain, syncedLines, instrumental}
 let lyricsOpen = false;
@@ -687,16 +780,20 @@ async function fetchState(){
   const prevProg = state.localProgress;
   const prevWasPlaying = state.isPlaying;
 
-  const data = await api('/me/player');
-  if(!data || !data.item){
+  const data = await api('/me/player','GET',null,{silent:true});
+  if(!data){state.playbackHydrated=false;return false;}
+  state.playbackHydrated=true;
+  if(!data.item){
     // CASE A: Spotify reports nothing playing, but we were just at the end of a track.
     // Likely the SDK stopped without auto-advancing — force /next.
     if(prevWasPlaying && prevUri && prevDur > 0 && prevProg >= prevDur - 2500){
       await forceNextIfStuck('no item after expected end', prevUri);
-      return;
+      return true;
     }
+    state.isPlaying=false;
     showIdle();
-    return;
+    if(state._sleepExpiredPending){state._sleepExpiredPending=false;setTimeout(finishSleepTimer,0);}
+    return true;
   }
   state.isPlaying=data.is_playing;state.shuffleState=data.shuffle_state;state.repeatState=data.repeat_state;
   state.localDuration=data.item.duration_ms||0;
@@ -726,8 +823,10 @@ async function fetchState(){
   try{ localStorage.setItem(KEYS.lastPlayed, JSON.stringify({trackUri:data.item.uri,trackName:data.item.name,artists:(data.item.artists||[]).map(a=>a.name).join(', '),contextUri:data.context?.uri||null,ts:Date.now()})); }catch{}
   await updateContextLine(data.context, data.item);
   updateNowPlaying(data);updateControls();updateMediaSession(data);
-  loadLyricsForCurrentTrack();
-  refreshUpNext();
+  const shouldRefreshQueue=state._lastQueueTrackUri!==data.item.uri||Date.now()-(state._queueRefreshAt||0)>60000;
+  if(shouldRefreshQueue){state._lastQueueTrackUri=data.item.uri;state._queueRefreshAt=Date.now();refreshUpNext();}
+  if(state._sleepExpiredPending){state._sleepExpiredPending=false;setTimeout(finishSleepTimer,0);}
+  return true;
 }
 
 async function updateContextLine(ctx, currentTrack){
@@ -758,8 +857,8 @@ async function updateContextLine(ctx, currentTrack){
       }
       // For playlist/album also cache track URIs to compute "track N of M"
       if(ctx.type === 'playlist'){
-        const tlist = await api('/playlists/'+ctx.uri.split(':').pop()+'/tracks?limit=100&fields=items(track(uri))');
-        info.trackUris = (tlist?.items||[]).map(it=>it.track?.uri).filter(Boolean);
+        const tlist = await api('/playlists/'+ctx.uri.split(':').pop()+'/items?limit=50&fields=items(item(uri))');
+        info.trackUris = (tlist?.items||[]).map(entry=>(entry.item||entry.track)?.uri).filter(Boolean);
         info.total = info.trackUris.length;
       } else if(ctx.type === 'album'){
         const tlist = await api('/albums/'+ctx.uri.split(':').pop()+'/tracks?limit=50');
@@ -787,41 +886,7 @@ async function updateContextLine(ctx, currentTrack){
   }
   if(posEl) posEl.textContent = posLabel;
   if(el) el.style.display = 'block';
-  // Refresh the one-tap save button. For playlists we need followedPlaylistSet to be fresh.
-  if(state.currentContextType === 'playlist') ensureFollowedPlaylists().then(updateContextSaveBtn);
-  else updateContextSaveBtn();
-}
-
-function updateContextSaveBtn(){
-  // The one-tap save button on the "playing from" line only handles playlists in dev mode.
-  // Album save (/me/albums) is blocked, follow-artist is blocked — for those contexts the
-  // button stays hidden.
-  const btn = document.getElementById('np-ctx-save');
-  if(!btn) return;
-  const type = state.currentContextType;
-  const uri = state.currentContextUri;
-  if(type !== 'playlist' || !uri){ btn.classList.remove('show','liked'); return; }
-  const id = uri.split(':').pop();
-  btn.classList.add('show');
-  const liked = followedPlaylistSet.has(id);
-  btn.classList.toggle('liked', liked);
-  btn.title = liked ? 'Remove playlist from your library' : 'Save playlist to your library';
-}
-
-async function toggleContextSave(){
-  if(state.currentContextType !== 'playlist' || !state.currentContextUri) return;
-  const id = state.currentContextUri.split(':').pop();
-  const wasFollowed = followedPlaylistSet.has(id);
-  if(wasFollowed) followedPlaylistSet.delete(id); else followedPlaylistSet.add(id);
   updateContextSaveBtn();
-  const r = await api('/playlists/'+id+'/followers', wasFollowed?'DELETE':'PUT', wasFollowed?null:{public:false});
-  if(r === null){
-    if(wasFollowed) followedPlaylistSet.add(id); else followedPlaylistSet.delete(id);
-    updateContextSaveBtn();
-    return;
-  }
-  _followedLoadedAt = 0; // invalidate cache so the next Library load is fresh
-  toast(wasFollowed?'Playlist removed from Library':'Playlist saved to Library','success');
 }
 
 function updateNowPlaying(data){
@@ -849,15 +914,31 @@ function updateNowPlaying(data){
   if(track.explicit)albumLine += '<span class="np-explicit">E</span>';
   document.getElementById('np-album').innerHTML = albumLine;
   if(data.device){
+    const reportedVolume=Number(data.device.volume_percent);
+    state.supportsVolume=data.device.supports_volume!==false&&data.device.volume_percent!=null&&Number.isFinite(reportedVolume);
+    if(state.supportsVolume)state.confirmedVolume=Math.max(0,Math.min(100,reportedVolume));
+    else{state._fadeStartVol=null;state._fadeLastSent=null;}
     document.getElementById('device-info').textContent = '▸ '+data.device.name+' · '+(data.device.type||'device');
     const volSlider = document.getElementById('volume-slider');
+    volSlider.disabled=!state.supportsVolume;
+    volSlider.setAttribute('aria-label',state.supportsVolume?'Playback volume':'Use the iPhone volume buttons');
     if(document.activeElement !== volSlider){ // don't fight the user mid-drag
-      volSlider.value = data.device.volume_percent ?? 80;
-      document.getElementById('vol-pct').textContent = data.device.volume_percent ?? '—';
+      if(state.supportsVolume)volSlider.value=state.confirmedVolume;
+      document.getElementById('vol-pct').textContent=state.supportsVolume?state.confirmedVolume:'side';
     }
     document.getElementById('settings-device').textContent = data.device.name+' ('+(data.device.type||'device')+')';
   }
   document.getElementById('status-dot').classList.add('live');
+  const lyricTrackId=track.type==='track'&&track.id?track.id:null;
+  const lyricsSection=document.getElementById('lyrics-section');
+  if((lyricsOpen||lyricsCurrentTrackId)&&lyricsCurrentTrackId!==lyricTrackId){
+    lyricsOpen=false;lyricsCurrentTrackId=null;lyricsActiveLineIdx=-1;
+    const lyricsContent=document.getElementById('lyrics-content'),lyricsToggle=document.getElementById('lyrics-toggle');
+    if(lyricsContent){lyricsContent.style.display='none';lyricsContent.innerHTML='';}
+    if(lyricsToggle)lyricsToggle.textContent='▼ Lyrics';
+  }
+  if(lyricsSection)lyricsSection.style.display=lyricTrackId?'block':'none';
+  updateNowPlayingSave();
   updateProgress();
 }
 
@@ -1068,8 +1149,8 @@ function renderTrackItem(t,i,contextUri,extraBadgeHtml,clickJs){
 }
 function renderArtistItem(a,i){return `<div class="item" onclick="openDetail('artist','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${(a.genres||[]).slice(0,3).join(' · ')||'Artist'}</div><div class="item-meta">${a.followers?.total?a.followers.total.toLocaleString()+' followers':''}</div></div></div>`;}
 function renderAlbumItem(a,i){return `<div class="item" onclick="openDetail('album','${a.id}','${escapeAttr(a.name)}','${a.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(a.name)}</div><div class="item-subtitle">${escapeHtml(a.artists.map(ar=>ar.name).join(', '))}</div><div class="item-meta">${a.album_type} · ${a.total_tracks} tracks · ${a.release_date?.slice(0,4)||''}</div></div></div>`;}
-function renderPlaylistItem(p,i){return `<div class="item" onclick="openDetail('playlist','${p.id}','${escapeAttr(p.name)}','${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${p.tracks?.total||0} tracks</div></div></div>`;}
-function escapeAttr(s){return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function renderPlaylistItem(p,i){const total=p.items?.total??p.tracks?.total??0;return `<div class="item" onclick="openDetail('playlist','${p.id}','${escapeAttr(p.name)}','${p.uri}')"><div class="item-num">${String(i+1).padStart(2,'0')}</div><div class="item-content"><div class="item-title italic">${escapeHtml(p.name)}</div><div class="item-subtitle">${escapeHtml(p.owner?.display_name||'')}</div><div class="item-meta">${total} tracks</div></div></div>`;}
+function escapeAttr(s){return String(s||'').replace(/&/g,'&amp;').replace(/\\/g,'\\\\').replace(/\r/g,'\\r').replace(/\n/g,'\\n').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 async function playUri(trackUri,contextUri){activateSdkAudio();const body=contextUri?{context_uri:contextUri}:{uris:[trackUri]};const path='/me/player/play'+devQS(false);await api(path,'PUT',body);setTimeout(fetchState,1000);switchView('now-playing');}
 async function playArtist(artistUri){activateSdkAudio();const path='/me/player/play'+devQS(false);await api(path,'PUT',{context_uri:artistUri});setTimeout(fetchState,1000);switchView('now-playing');}
@@ -1139,19 +1220,12 @@ async function openDetail(type, id, name, uri){
   document.getElementById('detail-title').textContent = state.detail.name;
   document.getElementById('detail-subtitle').textContent = type;
   document.getElementById('detail-list').innerHTML = '<div class="empty"><span class="spinner"></span>loading…</div>';
-  const saveBtn = document.getElementById('detail-save');
-  if(type === 'album'){
-    // Album save (/me/albums) is blocked in dev mode and the UI was retired — no save button.
-    saveBtn.style.display = 'none';
-    await loadAlbumDetail(id);
-  }
-  else if(type === 'playlist'){
-    saveBtn.style.display = 'inline-flex';
-    await loadPlaylistDetail(id);
-  }
-  else if(type === 'artist'){ saveBtn.style.display='none'; await loadArtistDetail(id); }
+  updateDetailSaveBtn();
+  if(type === 'album') await loadAlbumDetail(id);
+  else if(type === 'playlist') await loadPlaylistDetail(id);
+  else if(type === 'artist') await loadArtistDetail(id);
   else { // e.g. 'show' context — no drill-down support; don't leave the spinner forever
-    saveBtn.style.display='none';
+    updateDetailSaveBtn();
     document.getElementById('detail-list').innerHTML = '<div class="empty">no detail view for this type</div>';
   }
 }
@@ -1169,29 +1243,27 @@ async function loadAlbumDetail(id){
   // Tracks here lack the .album field; inject for nicer rendering.
   const html = state.detail.tracks.map((t,i)=>renderTrackItem({...t, album:{name:album.name}}, i, album.uri)).join('');
   document.getElementById('detail-list').innerHTML = html || '<div class="empty">no tracks</div>';
+  updateDetailSaveBtn();
 }
 async function loadPlaylistDetail(id){
-  // /playlists/{id}/tracks is known-restricted in dev mode for non-owned public playlists →
-  // pass silent so the misleading "Premium required" toast doesn't fire on the expected 403.
-  const [pl, tracks] = await Promise.all([
-    api('/playlists/'+id+'?fields=name,owner.display_name,tracks.total,uri'),
-    api('/playlists/'+id+'/tracks?limit=50&market=from_token&fields=items(track(id,uri,name,duration_ms,explicit,artists(name),album(name)))', 'GET', null, {silent:true})
+  // Spotify's 2026 playlist API uses /items and an entry.item payload. Keep entry.track as
+  // a compatibility fallback for older cached or transitional responses.
+  const [pl, playlistItems] = await Promise.all([
+    api('/playlists/'+id+'?fields=name,owner.display_name,items.total,uri'),
+    api('/playlists/'+id+'/items?limit=50&market=from_token&fields=items(item(id,uri,name,duration_ms,explicit,artists(name),album(name)))', 'GET', null, {silent:true})
   ]);
   if(!pl){document.getElementById('detail-list').innerHTML='<div class="empty">playlist unavailable</div>';return;}
   state.detail.uri = pl.uri;
-  const items = (tracks?.items||[]).map(it=>it.track).filter(Boolean);
+  const items = (playlistItems?.items||[]).map(entry=>entry.item||entry.track).filter(Boolean);
   state.detail.tracks = items;
   document.getElementById('detail-title').textContent = pl.name;
-  // If we couldn't read the tracks, say so explicitly instead of "0 tracks".
+  // If we couldn't read the items, say so explicitly instead of "0 tracks".
   const owner = pl.owner?.display_name ? 'by '+pl.owner.display_name : '';
+  const total = pl.items?.total ?? pl.tracks?.total ?? 0;
   const trackInfo = items.length
     ? items.length + ' tracks'
-    : (pl.tracks?.total ? pl.tracks.total + ' tracks (track list restricted)' : 'track list restricted');
+    : (total ? total + ' tracks (track list restricted)' : 'track list restricted');
   document.getElementById('detail-subtitle').textContent = [owner, trackInfo].filter(Boolean).join(' · ');
-  // Determine saved/followed status from cached followedPlaylistSet (Spotify's /contains endpoint
-  // is 403 for playlists, so we maintain the set ourselves from /me/playlists).
-  await ensureFollowedPlaylists();
-  state.detail.saved = followedPlaylistSet.has(id);
   updateDetailSaveBtn();
   if(!items.length){
     document.getElementById('detail-list').innerHTML = '<div class="empty"><div class="empty-art">·</div>track list restricted by Spotify for this playlist<br>use ▶ Play all to start it anyway</div>';
@@ -1201,20 +1273,6 @@ async function loadPlaylistDetail(id){
   document.getElementById('detail-list').innerHTML = html;
 }
 
-// Cache /me/playlists as a Set for fast follow-status checks. Refreshed when stale.
-let _followedLoadedAt = 0;
-async function ensureFollowedPlaylists(force){
-  if(!force && _followedLoadedAt && Date.now() - _followedLoadedAt < 30000) return;
-  let url = '/me/playlists?limit=50';
-  followedPlaylistSet.clear();
-  while(url){
-    const data = await api(url);
-    if(!data?.items) break;
-    data.items.filter(Boolean).forEach(p => followedPlaylistSet.add(p.id));
-    url = data.next ? data.next.replace('https://api.spotify.com/v1','') : null;
-  }
-  _followedLoadedAt = Date.now();
-}
 async function loadArtistDetail(id){
   // /artists/{id}/top-tracks is always 403 in dev mode → silent so we don't toast misleadingly.
   const [artist, top] = await Promise.all([
@@ -1228,6 +1286,7 @@ async function loadArtistDetail(id){
   const sub = (artist.genres||[]).slice(0,3).join(' · ') || 'Artist';
   const followers = artist.followers?.total ? ' · '+artist.followers.total.toLocaleString()+' followers' : '';
   document.getElementById('detail-subtitle').textContent = sub + followers + (state.detail.tracks.length?' · top tracks':'');
+  updateDetailSaveBtn();
   if(!state.detail.tracks.length){
     document.getElementById('detail-list').innerHTML = '<div class="empty"><div class="empty-art">·</div>top tracks restricted by Spotify for this app<br>use ▶ Play all to start the artist radio</div>';
     return;
@@ -1249,31 +1308,6 @@ async function detailPlayAll(){
     await api(path,'PUT',{context_uri: state.detail.uri});
     setTimeout(fetchState,1000);switchView('now-playing');
   }
-}
-async function detailToggleSave(){
-  if(!state.detail || state.detail.type !== 'playlist') return;
-  const id = state.detail.id;
-  const wasFollowed = followedPlaylistSet.has(id);
-  if(wasFollowed) followedPlaylistSet.delete(id); else followedPlaylistSet.add(id);
-  state.detail.saved = !wasFollowed;
-  updateDetailSaveBtn();
-  const r = await api('/playlists/'+id+'/followers', wasFollowed?'DELETE':'PUT', wasFollowed?null:{public:false});
-  if(r === null){
-    if(wasFollowed) followedPlaylistSet.add(id); else followedPlaylistSet.delete(id);
-    state.detail.saved = wasFollowed;
-    updateDetailSaveBtn();
-    return;
-  }
-  _followedLoadedAt = 0; // invalidate cache so Library re-fetches
-  toast(wasFollowed?'Playlist removed from Library':'Playlist saved to Library','success');
-}
-function updateDetailSaveBtn(){
-  const btn = document.getElementById('detail-save');
-  const label = document.getElementById('detail-save-label');
-  if(!btn || !state.detail) return;
-  const saved = state.detail.saved;
-  btn.classList.toggle('liked', !!saved);
-  if(label) label.textContent = saved ? 'Saved' : 'Save';
 }
 
 let _likedUris = []; // populated by loadLibrary, consumed by shuffleLiked
@@ -1407,6 +1441,7 @@ function switchView(name){
   if(name==='library')loadLibrary();
   if(name==='queue')loadQueue();
   if(name==='now-playing')refreshUpNext();
+  if(name==='settings')renderDiagnostics();
 }
 
 function openModal(name){document.getElementById('modal-'+name)?.classList.add('active');if(name==='devices')loadDevices();}
@@ -1439,7 +1474,7 @@ function showApp(){
   document.getElementById('setup').style.display='none';
   document.getElementById('app').classList.add('active');
   document.getElementById('user-display').textContent = state.user?.display_name || state.user?.id || '';
-  document.getElementById('settings-account').textContent = state.user?.email ? state.user.email+' ('+state.user.product+')' : state.user?.id || '';
+  document.getElementById('settings-account').textContent = state.user?.display_name || 'Spotify account';
   fetchState();
   startProgressTick();
   clearInterval(state.pollTimer);
@@ -1703,7 +1738,6 @@ function createWebPlayer(){
         // SDK disconnected — happens on iOS screen lock / background suspend
         state.sdkReady = false;
         state.sdkActivated = false;
-        stopIosKeepAlive();
         return;
       }
       const curUri = s.track_window?.current_track?.uri;
@@ -1715,8 +1749,6 @@ function createWebPlayer(){
       }
       // Track the URI of whatever is currently playing so the next end event has a reference.
       if(curUri && !s.paused) state._lastSdkPlayingUri = curUri;
-      // iOS keep-alive: maintain silent audio loop while SDK is playing
-      if(!s.paused){ startIosKeepAlive(); } else { stopIosKeepAlive(); }
     });
     player.connect().then(success => {
       console.log('[SDK] connect result:', success);
@@ -1734,26 +1766,11 @@ function activateSdkAudio(){
       state.webPlayer.activateElement();
       state.sdkActivated = true;
       console.log('[SDK] element activated for iOS audio');
-      startIosKeepAlive();
     }
   } catch(e){ console.warn('[SDK] activateElement failed:', e); }
 }
 
-function startIosKeepAlive() {
-  const el = document.getElementById('iosKeepAlive');
-  if (el && el.paused) {
-    el.play().catch(() => {}); // ignore if autoplay blocked
-  }
-}
-
-function stopIosKeepAlive() {
-  const el = document.getElementById('iosKeepAlive');
-  if (el && !el.paused) {
-    el.pause();
-    el.currentTime = 0;
-  }
-}
-
+// iOS background suspension is handled by rebuilding the Spotify player on wake.
 async function playHere(){
   activateSdkAudio();
   if(!state.sdkReady || !state.cleanplayDeviceId){toast('Web player not ready · need Premium','error'); return;}
@@ -1777,7 +1794,6 @@ function signOut(){
   clearInterval(state.progressTimer);
   if(state.sleepTimerInterval){clearInterval(state.sleepTimerInterval);state.sleepTimerInterval=null;}
   state.sleepTimerEnd=0;
-  stopIosKeepAlive();
   // Disconnect the Web Playback SDK so re-login can create a fresh player with new tokens.
   if(state.webPlayer){
     try{ state.webPlayer.disconnect(); }catch{}
@@ -1817,43 +1833,1228 @@ async function decideNextScreen(){
   showSetup();
 }
 
-document.addEventListener('visibilitychange', async () => {
-  if(document.visibilityState !== 'visible') return;
-  // App came back to foreground after screen wake / app-switch
-
-  // 1. Check if the SDK device is still alive
-  if(state.webPlayer && state.sdkReady){
-    try{
-      const sdkState = await state.webPlayer.getCurrentState();
-      if(!sdkState){
-        // SDK device was silently disconnected while backgrounded
-        state.sdkReady = false;
-        state.sdkActivated = false;
-        if(state.activeDeviceId === state.cleanplayDeviceId){
-          state.activeDeviceId = null;
-        }
-        // Gentle status (not an error toast) — SDK will re-register and fire 'ready'
-        const devEl = document.getElementById('device-info');
-        if(devEl) devEl.textContent = '↻ Reconnecting…';
-      }
-    }catch{}
-  }
-
-  // 2. If SDK is the active device, ensure the keep-alive audio is still running
-  if(state.sdkReady && state.activeDeviceId === state.cleanplayDeviceId){
-    startIosKeepAlive();
-  }
-
-  // 3. Immediately refresh now-playing instead of waiting up to 5s for the poll tick
-  if(state.accessToken && document.getElementById('app')?.classList.contains('active')){
-    clearInterval(state.pollTimer);
-    fetchState();
-    state.pollTimer = setInterval(fetchState, 5000);
-  }
+// ==== CLEANPLAY V3: IOS-SAFE SDK AND LIFECYCLE ===============================
+KEYS.preferredTarget = 'cp_preferred_target_v1';
+KEYS.sleepTimerEnd = 'cp_sleep_timer_end';
+Object.assign(state,{
+  preferredTarget:null,
+  pendingPlaybackIntent:null,
+  sdkScriptPromise:null,
+  sdkConnectPromise:null,
+  sdkReadyPromise:null,
+  sdkReadyResolve:null,
+  sdkRebuildPromise:null,
+  resumePromise:null,
+  needsSdkRecovery:false,
+  confirmedVolume:80,
+  lifecycleReason:'manual'
 });
 
-window.addEventListener('load',()=>{ decideNextScreen(); initSeekDrag(); renderSearchHistory(); });
+function noteDiagnostic(category,event,fields){
+  if(typeof recordDiagnostic==='function')recordDiagnostic(category,event,fields||{});
+}
+function preferredTargetFromStorage(){
+  try{
+    const value=JSON.parse(localStorage.getItem(KEYS.preferredTarget)||'null');
+    if(value&&value.kind==='here')return {kind:'here',deviceId:null};
+    if(value&&value.kind==='remote')return {kind:'remote',deviceId:null};
+  }catch{}
+  return {kind:'remote',deviceId:null};
+}
+function setPreferredTarget(kind,deviceId){
+  state.preferredTarget={kind:kind==='here'?'here':'remote',deviceId:kind==='remote'&&deviceId?String(deviceId).slice(0,180):null};
+  try{localStorage.setItem(KEYS.preferredTarget,JSON.stringify({version:1,kind:state.preferredTarget.kind}));}catch{}
+}
+state.preferredTarget=preferredTargetFromStorage();
+try{localStorage.setItem(KEYS.preferredTarget,JSON.stringify({version:1,kind:state.preferredTarget.kind}));}catch{}
+
+function setConnectionHealth(mode,summary,detail,banner){
+  const status=document.getElementById('connection-status');
+  const statusDot=document.getElementById('status-dot');
+  const healthDot=document.getElementById('health-dot');
+  const healthSummary=document.getElementById('health-summary');
+  const healthDetail=document.getElementById('health-detail');
+  const bannerEl=document.getElementById('connection-banner');
+  const bannerText=document.getElementById('connection-banner-text');
+  const live=mode==='online';
+  if(status)status.textContent=summary||'Connection';
+  if(statusDot)statusDot.classList.toggle('live',live);
+  if(healthDot)healthDot.classList.toggle('live',live);
+  if(healthSummary)healthSummary.textContent=summary||'Connection';
+  if(healthDetail)healthDetail.textContent=detail||'';
+  if(bannerEl){
+    bannerEl.classList.toggle('show',!!banner);
+    bannerEl.classList.toggle('error',mode==='error'||mode==='offline');
+  }
+  if(bannerText&&banner)bannerText.textContent=banner;
+}
+function isAppVisible(){
+  return document.visibilityState==='visible'&&document.getElementById('app')&&document.getElementById('app').classList.contains('active');
+}
+function stopPolling(){
+  clearInterval(state.pollTimer);
+  state.pollTimer=null;
+}
+function startPolling(){
+  stopPolling();
+  if(!isAppVisible()||!state.accessToken)return;
+  state.pollTimer=setInterval(function(){if(isAppVisible())fetchState();},15000);
+}
+
+function loadSpotifySdk(){
+  if(window.Spotify&&window.Spotify.Player){window._sdkReady=true;return Promise.resolve();}
+  if(state.sdkScriptPromise)return state.sdkScriptPromise;
+  noteDiagnostic('sdk','sdk_load',{reason:'manual',target:state.preferredTarget.kind});
+  state.sdkScriptPromise=new Promise(function(resolve,reject){
+    let settled=false;
+    const finish=function(handler,value){if(settled)return;settled=true;clearTimeout(timeout);handler(value);};
+    const timeout=setTimeout(function(){finish(reject,new Error('sdk_load_timeout'));},12000);
+    const stale=document.querySelector('script[data-cleanplay-sdk]');
+    if(stale)stale.remove();
+    const script=document.createElement('script');
+    script.src='https://sdk.scdn.co/spotify-player.js';
+    script.async=true;
+    script.dataset.cleanplaySdk='true';
+    script.addEventListener('load',function(){window._sdkReady=true;finish(resolve);},{once:true});
+    script.addEventListener('error',function(){finish(reject,new Error('sdk_load_failed'));},{once:true});
+    document.head.appendChild(script);
+  }).catch(function(error){
+    state.sdkScriptPromise=null;
+    const failedScript=document.querySelector('script[data-cleanplay-sdk]');
+    if(failedScript)failedScript.remove();
+    noteDiagnostic('sdk','sdk_connect',{reason:'manual',target:state.preferredTarget.kind,outcome:'failed'});
+    setConnectionHealth('error','Player unavailable','CleanPlay could not load the in-browser player. Remote devices can still work.','The in-browser player could not load. Check the connection and retry.');
+    throw error;
+  });
+  return state.sdkScriptPromise;
+}
+function resolveSdkReady(value){
+  if(state.sdkReadyResolve){state.sdkReadyResolve(!!value);state.sdkReadyResolve=null;}
+}
+function makeSdkReadyPromise(){
+  state.sdkReadyPromise=new Promise(function(resolve){
+    state.sdkReadyResolve=resolve;
+    setTimeout(function(){if(state.sdkReadyResolve){state.sdkReadyResolve(false);state.sdkReadyResolve=null;}},10000);
+  });
+  return state.sdkReadyPromise;
+}
+function invalidateSdkDevice(reason,reportedId){
+  const stale=state.cleanplayDeviceId;
+  state.staleCleanplayDeviceId=stale||reportedId||state.staleCleanplayDeviceId||null;
+  state.sdkReady=false;
+  state.sdkActivated=false;
+  state.needsSdkRecovery=true;
+  state.cleanplayDeviceId=null;
+  if(state.activeDeviceId&&(state.activeDeviceId===stale||state.activeDeviceId===reportedId))state.activeDeviceId=null;
+  resolveSdkReady(false);
+  noteDiagnostic('sdk',reason==='not_ready'?'sdk_not_ready':'sdk_rebuild',{reason:reason,target:'here',outcome:'retry'});
+}
+function disconnectWebPlayer(){
+  const player=state.webPlayer;
+  const stale=state.cleanplayDeviceId;
+  if(stale)state.staleCleanplayDeviceId=stale;
+  if(stale&&state.activeDeviceId===stale)state.activeDeviceId=null;
+  state.webPlayer=null;
+  state.sdkReady=false;
+  state.sdkActivated=false;
+  state.cleanplayDeviceId=null;
+  resolveSdkReady(false);
+  if(player){try{player.disconnect();}catch{}}
+}
+function createWebPlayer(){
+  if(state.webPlayer||!state.accessToken||!window.Spotify||!window.Spotify.Player)return state.webPlayer;
+  makeSdkReadyPromise();
+  const player=new Spotify.Player({
+    name:'CleanPlay - this iPhone',
+    getOAuthToken:function(callback){
+      Promise.resolve(ensureToken()).then(function(ok){
+        if(ok&&state.accessToken)callback(state.accessToken);
+        else noteDiagnostic('sdk','sdk_auth_error',{reason:'token_expired',target:'here',outcome:'degraded'});
+      });
+    },
+    volume:0.8
+  });
+  state.webPlayer=player;
+  player.addListener('ready',function(payload){
+    const oldId=state.cleanplayDeviceId;
+    const staleId=state.staleCleanplayDeviceId;
+    state.cleanplayDeviceId=payload.device_id;
+    state.sdkReady=true;
+    state.needsSdkRecovery=false;
+    if(state.preferredTarget.kind==='here'||state.activeDeviceId&&(state.activeDeviceId===oldId||state.activeDeviceId===staleId))state.activeDeviceId=payload.device_id;
+    state.staleCleanplayDeviceId=null;
+    resolveSdkReady(true);
+    noteDiagnostic('sdk','sdk_ready',{reason:state.lifecycleReason||'manual',target:'here',outcome:'ok'});
+    setConnectionHealth('online','Ready','Spotify account connected. In-browser player is ready.');
+    const pending=state.pendingPlaybackIntent;
+    if(pending&&typeof pending.run==='function'){
+      state.pendingPlaybackIntent=null;
+      if(state.sdkActivated&&Date.now()-pending.createdAt<15000)Promise.resolve().then(pending.run);
+      else setConnectionHealth('recovering','Tap play again','iOS needs one fresh tap now that the player is ready.','Tap play once more to enable audio on this iPhone.');
+    }
+  });
+  player.addListener('not_ready',function(payload){
+    invalidateSdkDevice('not_ready',payload&&payload.device_id);
+    if(isAppVisible())setTimeout(function(){resumeSession('not_ready');},250);
+  });
+  player.addListener('authentication_error',function(){
+    invalidateSdkDevice('auth');
+    noteDiagnostic('sdk','sdk_auth_error',{reason:'auth',target:'here',outcome:'retry'});
+    Promise.resolve(ensureToken(true)).then(function(ok){if(ok&&isAppVisible())rebuildWebPlayer('auth');});
+  });
+  player.addListener('initialization_error',function(){
+    noteDiagnostic('sdk','sdk_connect',{reason:'manual',target:'here',outcome:'failed'});
+    setConnectionHealth('error','Player unavailable','The browser player could not start. Remote Spotify devices remain available.','The in-browser player could not start.');
+  });
+  player.addListener('account_error',function(){
+    setConnectionHealth('error','Premium needed','In-browser playback requires Spotify Premium. Remote control may still work.','Spotify Premium is needed for playback on this iPhone.');
+  });
+  player.addListener('autoplay_failed',function(){
+    state.sdkActivated=false;state.pendingPlaybackIntent=null;
+    noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
+    setConnectionHealth('recovering','Tap play again','iOS blocked autoplay after the player changed.','Tap play once more to enable audio on this iPhone.');
+  });
+  player.addListener('playback_error',function(){
+    noteDiagnostic('playback','command_failed',{reason:'manual',target:'here',outcome:'failed'});
+  });
+  player.addListener('player_state_changed',function(sdkState){
+    if(!sdkState){
+      invalidateSdkDevice('null_state');
+      if(isAppVisible())setTimeout(function(){resumeSession('null_state');},250);
+      return;
+    }
+    const current=sdkState.track_window&&sdkState.track_window.current_track&&sdkState.track_window.current_track.uri;
+    const previous=sdkState.track_window&&sdkState.track_window.previous_tracks&&sdkState.track_window.previous_tracks[0]&&sdkState.track_window.previous_tracks[0].uri;
+    const ended=sdkState.paused&&sdkState.position===0&&previous&&previous===state._lastSdkPlayingUri;
+    if(ended)forceNextIfStuck('sdk_end',previous);
+    if(current&&!sdkState.paused)state._lastSdkPlayingUri=current;
+  });
+  noteDiagnostic('sdk','sdk_connect',{reason:state.lifecycleReason||'manual',target:'here',outcome:'retry'});
+  state.sdkConnectPromise=Promise.resolve(player.connect()).then(function(success){
+    if(!success){
+      disconnectWebPlayer();
+      noteDiagnostic('sdk','sdk_connect',{reason:'manual',target:'here',outcome:'failed'});
+      return false;
+    }
+    return true;
+  }).catch(function(){
+    disconnectWebPlayer();
+    noteDiagnostic('sdk','sdk_connect',{reason:'manual',target:'here',outcome:'failed'});
+    return false;
+  });
+  return player;
+}
+function initWebPlayer(){
+  return loadSpotifySdk().then(function(){return createWebPlayer();}).catch(function(){return null;});
+}
+function rebuildWebPlayer(reason){
+  if(!isAppVisible())return Promise.resolve(false);
+  if(state.sdkRebuildPromise)return state.sdkRebuildPromise;
+  state.lifecycleReason=reason||'wake';
+  noteDiagnostic('sdk','sdk_rebuild',{reason:reason||'wake',target:'here',outcome:'retry'});
+  state.sdkRebuildPromise=loadSpotifySdk().then(function(){
+    disconnectWebPlayer();
+    const player=createWebPlayer();
+    return player&&state.sdkReadyPromise?state.sdkReadyPromise:false;
+  }).then(function(ready){return !!ready;}).catch(function(){return false;}).finally(function(){state.sdkRebuildPromise=null;});
+  return state.sdkRebuildPromise;
+}
+function rebuildWebPlayerForGesture(){
+  if(!window.Spotify||!window.Spotify.Player)return null;
+  disconnectWebPlayer();
+  const player=createWebPlayer();
+  activateSdkAudio();
+  return player;
+}
+function activateSdkAudio(){
+  const player=state.webPlayer;
+  if(!player||typeof player.activateElement!=='function')return false;
+  try{
+    const activation=player.activateElement();
+    state.sdkActivated=true;
+    if(activation&&typeof activation.catch==='function'){
+      activation.catch(function(){
+        state.sdkActivated=false;
+        noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
+        setConnectionHealth('recovering','Tap play again','iOS did not enable audio on the first attempt.','Tap play once more to enable audio on this iPhone.');
+      });
+    }
+    noteDiagnostic('lifecycle','visible',{reason:'gesture',target:'here',outcome:'ok'});
+    return true;
+  }catch{
+    state.sdkActivated=false;
+    return false;
+  }
+}
+
+async function reconcileDevices(){
+  const data=await api('/me/player/devices','GET',null,{silent:true});
+  if(!data||!Array.isArray(data.devices)){
+    noteDiagnostic('recovery','device_reconcile',{reason:'device_missing',target:state.preferredTarget.kind,outcome:'degraded'});
+    return false;
+  }
+  const devices=data.devices.filter(Boolean);
+  const localId=state.cleanplayDeviceId;
+  if(state.preferredTarget.kind==='here'){
+    const localListed=!!localId&&devices.some(function(device){return device.id===localId;});
+    if(state.sdkReady&&localId&&localListed){
+      state.activeDeviceId=localId;
+      noteDiagnostic('recovery','device_reconcile',{reason:'wake',target:'here',outcome:'ok'});
+      return true;
+    }
+    state.activeDeviceId=null;
+    return false;
+  }
+  let selected=state.preferredTarget.deviceId&&devices.find(function(device){return device.id===state.preferredTarget.deviceId;});
+  if(!selected)selected=devices.find(function(device){return device.is_active&&device.id!==localId;});
+  if(!selected&&state.activeDeviceId)selected=devices.find(function(device){return device.id===state.activeDeviceId&&device.id!==localId;});
+  state.activeDeviceId=selected?selected.id:null;
+  if(selected&&state.preferredTarget.deviceId!==selected.id)setPreferredTarget('remote',selected.id);
+  noteDiagnostic('recovery','device_reconcile',{reason:'wake',target:selected?'remote':'none',outcome:selected?'ok':'degraded'});
+  return !!selected;
+}
+async function verifyIdentityFirst(){
+  const me=await api('/me','GET',null,{silent:true});
+  if(!me)return false;
+  state.user=me;
+  const account=document.getElementById('settings-account');
+  if(account)account.textContent=(me.display_name||'Spotify account')+(me.product?' - '+me.product:'');
+  return true;
+}
+async function resumeSession(reason){
+  if(state.resumePromise)return state.resumePromise;
+  if(!isAppVisible())return false;
+  reason=reason||'wake';
+  state.lifecycleReason=reason;
+  noteDiagnostic('lifecycle','resume_start',{reason:reason,target:state.preferredTarget.kind,outcome:'retry'});
+  setConnectionHealth('recovering','Reconnecting','Refreshing the account, player, and device.','Restoring the Spotify connection...');
+  state.resumePromise=(async function(){
+    if(!navigator.onLine){
+      noteDiagnostic('network','offline',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
+      setConnectionHealth('offline','Offline','Listen Later remains available on this device.','You are offline. CleanPlay will retry when the connection returns.');
+      return false;
+    }
+    if(!await ensureToken()){
+      noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
+      return false;
+    }
+    if(!await verifyIdentityFirst()){
+      noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
+      setConnectionHealth('error','Spotify unreachable','Your sign-in was kept. CleanPlay will retry without signing you out.','Spotify is temporarily unreachable. Your sign-in is still saved.');
+      return false;
+    }
+    if(state.preferredTarget.kind==='here'){
+      if(!state.webPlayer)await initWebPlayer();
+      else{
+        let sdkState=null;
+        try{sdkState=await state.webPlayer.getCurrentState();}catch{}
+        if(!sdkState)state.needsSdkRecovery=true;
+      }
+      if(state.needsSdkRecovery||!state.sdkReady)await rebuildWebPlayer(reason);
+    }else if(state.webPlayer)disconnectWebPlayer();
+    const deviceReady=await reconcileDevices();
+    const playbackReady=await fetchState();
+    startPolling();
+    if(!playbackReady){
+      noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
+      setConnectionHealth('error','Spotify state unavailable','Your sign-in and selected target were kept. CleanPlay will retry.','Spotify playback state is temporarily unavailable.');
+      return false;
+    }
+    noteDiagnostic('lifecycle','resume_ok',{reason:reason,target:state.preferredTarget.kind,outcome:'ok'});
+    if(deviceReady||state.currentTrackUri)setConnectionHealth('online','Connected','Spotify account and playback state are current.');
+    else setConnectionHealth('online','Spotify connected','Start Spotify on a device, then choose it in CleanPlay.');
+    return true;
+  })().catch(function(){
+    noteDiagnostic('lifecycle','resume_degraded',{reason:reason,target:state.preferredTarget.kind,outcome:'degraded'});
+    setConnectionHealth('error','Connection paused','Your sign-in was kept. Retry when the network is stable.','CleanPlay could not finish reconnecting. Your sign-in is still saved.');
+    return false;
+  }).finally(function(){state.resumePromise=null;});
+  return state.resumePromise;
+}
+function showApp(){
+  document.getElementById('setup').style.display='none';
+  document.getElementById('app').classList.add('active');
+  const account=document.getElementById('settings-account');
+  if(account&&state.user)account.textContent=(state.user.display_name||'Spotify account')+(state.user.product?' - '+state.user.product:'');
+  renderSavedLibrary();
+  restoreSleepTimer();
+  startProgressTick();
+  setupMediaSession();
+  resumeSession('manual');
+}
+async function playHere(){
+  if(!state.webPlayer&&window.Spotify&&window.Spotify.Player)createWebPlayer();
+  activateSdkAudio();
+  setPreferredTarget('here');
+  if(!state.sdkReady||!state.cleanplayDeviceId){
+    if(window.Spotify&&window.Spotify.Player)rebuildWebPlayerForGesture();
+    setConnectionHealth('recovering','Preparing iPhone','The in-browser player is reconnecting.','Preparing playback on this iPhone...');
+    resumeSession('gesture');
+    return;
+  }
+  state.activeDeviceId=state.cleanplayDeviceId;
+  const info=document.getElementById('device-info');
+  if(info)info.textContent='CleanPlay - this iPhone - selected';
+  setConnectionHealth('online','Ready here','Playback target is this iPhone.');
+  toast('This iPhone is ready','success');
+}
+// ==== CLEANPLAY V3: BOUNDED PLAYBACK RECOVERY ================================
+function playbackTargetKind(){return state.activeDeviceId&&state.cleanplayDeviceId&&state.activeDeviceId===state.cleanplayDeviceId?'here':(state.activeDeviceId?'remote':'none');}
+function withPlaybackTarget(path){
+  const id=state.activeDeviceId;
+  if(!id||id===state.cleanplayDeviceId&&!state.sdkReady)return path;
+  return path+(path.includes('?')?'&':'?')+'device_id='+encodeURIComponent(id);
+}
+function devQS(initial){
+  if(!state.activeDeviceId||state.activeDeviceId===state.cleanplayDeviceId&&!state.sdkReady)return '';
+  return (initial?'&':'?')+'device_id='+encodeURIComponent(state.activeDeviceId);
+}
+async function recoverPlaybackTarget(reason){
+  setConnectionHealth('recovering','Finding player','Checking available Spotify devices.','The playback device changed. CleanPlay is reconnecting...');
+  if(state.preferredTarget.kind==='here'){
+    if(reason==='device_missing'&&(state.sdkReady||state.cleanplayDeviceId))invalidateSdkDevice('device_missing',state.cleanplayDeviceId);
+    if(!state.sdkReady||!state.cleanplayDeviceId)await rebuildWebPlayer(reason||'device_missing');
+    if(state.sdkReady&&state.cleanplayDeviceId){state.activeDeviceId=state.cleanplayDeviceId;return true;}
+    return false;
+  }
+  return reconcileDevices();
+}
+async function playerCommand(command,requestFactory){
+  for(let attempt=0;attempt<2;attempt++){
+    const request=requestFactory(),failure={};
+    const result=await api(request.path,request.method||'PUT',request.body===undefined?null:request.body,{silent:true,failureSink:failure});
+    if(result!==null){
+      noteDiagnostic('playback','command_ok',{attempt:attempt,target:playbackTargetKind(),outcome:'ok'});
+      if(attempt)setConnectionHealth('online','Connected','Playback recovered on the selected device.');
+      return true;
+    }
+    const missingDevice=failure.status===404;
+    if(attempt===0&&missingDevice){
+      noteDiagnostic('playback','command_retry',{status:404,attempt:1,reason:'device_missing',target:playbackTargetKind(),outcome:'retry'});
+      if(await recoverPlaybackTarget('device_missing'))continue;
+    }
+    noteDiagnostic('playback','command_failed',{status:failure.status||0,attempt:attempt,target:playbackTargetKind(),outcome:'failed'});
+    if(!state.accessToken)return false;
+    if(missingDevice)setConnectionHealth('error','Player needs attention','Choose an available device, then try again.','CleanPlay could not reach the playback device. Your request was not applied.');
+    else setConnectionHealth('error','Playback request paused','The selected device was kept. Check the connection or Spotify authorization, then try again.','Playback could not be completed. No command was repeated.');
+    return false;
+  }
+  return false;
+}
+function preparePlaybackIntent(label,run){
+  const wantsHere=state.preferredTarget.kind==='here'||state.activeDeviceId&&state.activeDeviceId===state.cleanplayDeviceId;
+  if(!wantsHere)return false;
+  if(!state.webPlayer&&window.Spotify&&window.Spotify.Player)createWebPlayer();
+  if(state.sdkReady&&state.cleanplayDeviceId){activateSdkAudio();return false;}
+  if(window.Spotify&&window.Spotify.Player){rebuildWebPlayerForGesture();state.needsSdkRecovery=false;activateSdkAudio();}
+  else initWebPlayer();
+  state.pendingPlaybackIntent={label:label,run:run,createdAt:Date.now()};
+  noteDiagnostic('recovery','command_retry',{reason:'gesture',target:'here',outcome:'retry'});
+  setConnectionHealth('recovering','Waking player','Your request is saved and will run when this iPhone is ready.','Waking the in-browser player. Your request is waiting...');
+  return true;
+}
+async function playBody(label,body){
+  const run=async function(){
+    const ok=await playerCommand(label,function(){return {path:withPlaybackTarget('/me/player/play'),method:'PUT',body:body};});
+    if(ok){switchView('now-playing');setTimeout(fetchState,650);}
+    return ok;
+  };
+  if(preparePlaybackIntent(label,run))return false;
+  return run();
+}
+async function togglePlay(forcePlaying){
+  const nextPlaying=typeof forcePlaying==='boolean'?forcePlaying:!state.isPlaying;
+  const run=async function(){
+    const ok=await playerCommand(nextPlaying?'play':'pause',function(){return {path:withPlaybackTarget(nextPlaying?'/me/player/play':'/me/player/pause'),method:'PUT'};});
+    if(ok){state.isPlaying=nextPlaying;updateControls();if('mediaSession'in navigator)navigator.mediaSession.playbackState=nextPlaying?'playing':'paused';}
+    return ok;
+  };
+  if(preparePlaybackIntent(nextPlaying?'play':'pause',run))return false;
+  return run();
+}
+async function nextTrack(){
+  const run=async function(){const ok=await playerCommand('next',function(){return {path:withPlaybackTarget('/me/player/next'),method:'POST'};});if(ok)setTimeout(fetchState,450);return ok;};
+  if(preparePlaybackIntent('next',run))return false;
+  return run();
+}
+async function seekTo(positionMs){
+  const target=Math.max(0,Math.min(state.localDuration||positionMs,Math.floor(positionMs))),previous=state.localProgress;
+  const ok=await playerCommand('seek',function(){return {path:withPlaybackTarget('/me/player/seek?position_ms='+target),method:'PUT'};});
+  if(ok)state.localProgress=target;else state.localProgress=previous;
+  updateProgress();return ok;
+}
+async function prevTrack(){
+  if(state.localProgress>3000)return seekTo(0);
+  const run=async function(){const ok=await playerCommand('previous',function(){return {path:withPlaybackTarget('/me/player/previous'),method:'POST'};});if(ok)setTimeout(fetchState,450);return ok;};
+  if(preparePlaybackIntent('previous',run))return false;
+  return run();
+}
+async function toggleShuffle(){
+  const desired=!state.shuffleState;
+  const ok=await playerCommand('shuffle',function(){return {path:withPlaybackTarget('/me/player/shuffle?state='+desired),method:'PUT'};});
+  if(ok){state.shuffleState=desired;updateControls();}
+  return ok;
+}
+async function toggleRepeat(){
+  const modes=['off','context','track'],desired=modes[(modes.indexOf(state.repeatState)+1)%modes.length];
+  const ok=await playerCommand('repeat',function(){return {path:withPlaybackTarget('/me/player/repeat?state='+desired),method:'PUT'};});
+  if(ok){state.repeatState=desired;updateControls();toast('Repeat: '+desired,'success');}
+  return ok;
+}
+function setVolume(value){
+  if(state.supportsVolume===false)return;
+  const desired=Math.max(0,Math.min(100,parseInt(value)||0));
+  clearTimeout(setVolume._t);
+  setVolume._t=setTimeout(async function(){
+    const old=state.confirmedVolume??80;
+    const ok=await playerCommand('volume',function(){return {path:withPlaybackTarget('/me/player/volume?volume_percent='+desired),method:'PUT'};});
+    const slider=document.getElementById('volume-slider'),pct=document.getElementById('vol-pct');
+    if(ok){state.confirmedVolume=desired;if(pct)pct.textContent=desired;}
+    else{if(slider)slider.value=old;if(pct)pct.textContent=old;}
+  },220);
+}
+function nudgeVolume(delta){
+  const slider=document.getElementById('volume-slider');if(!slider)return;
+  const current=Number.parseInt(slider.value);
+  const value=Math.max(0,Math.min(100,(Number.isFinite(current)?current:(state.confirmedVolume??80))+delta));
+  slider.value=value;setVolume(value);
+}
+function initSeekDrag(){
+  const bar=document.getElementById('progress-bar');if(!bar||bar.dataset.seekReady)return;
+  bar.dataset.seekReady='true';
+  const fraction=function(event){const rect=bar.getBoundingClientRect();return Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width));};
+  const preview=function(value){document.getElementById('progress-fill').style.width=(value*100)+'%';document.getElementById('time-current').textContent=formatTime(value*state.localDuration);};
+  bar.addEventListener('pointerdown',function(event){if(!state.localDuration)return;state.seekDragging=true;bar.classList.add('dragging');try{bar.setPointerCapture(event.pointerId);}catch{}preview(fraction(event));});
+  bar.addEventListener('pointermove',function(event){if(state.seekDragging)preview(fraction(event));});
+  bar.addEventListener('pointerup',async function(event){if(!state.seekDragging)return;state.seekDragging=false;bar.classList.remove('dragging');await seekTo(fraction(event)*state.localDuration);});
+  bar.addEventListener('pointercancel',function(){state.seekDragging=false;bar.classList.remove('dragging');updateProgress();});
+}
+async function playUri(trackUri,contextUri){return playBody('play_track',contextUri?{context_uri:contextUri}:{uris:[trackUri]});}
+async function playArtist(artistUri){return playBody('play_artist',{context_uri:artistUri});}
+async function playContextUri(contextUri){return playBody('play_context',{context_uri:contextUri});}
+async function playUriInContext(trackUri,contextUri){return playBody('play_in_context',{context_uri:contextUri,offset:{uri:trackUri}});}
+async function playUris(uris){return playBody('play_list',{uris:(uris||[]).slice(0,50)});}
+async function playQueueFrom(index){
+  const uris=_queueSnapshot.slice(index).map(function(track){return track&&track.uri;}).filter(Boolean).slice(0,50);
+  return uris.length?playBody('play_queue',{uris:uris}):false;
+}
+async function addToQueue(trackUri,event){
+  if(event)event.stopPropagation();
+  const ok=await playerCommand('queue',function(){return {path:withPlaybackTarget('/me/player/queue?uri='+encodeURIComponent(trackUri)),method:'POST'};});
+  if(ok){recordQueueAdd(trackUri);state._queueRefreshAt=0;setTimeout(refreshUpNext,400);toast('Added to queue','success');}
+  return ok;
+}
+async function forceNextIfStuck(reason,uri){
+  if(uri&&uri===_autoAdvanceLastUri)return;
+  _autoAdvanceLastUri=uri||_autoAdvanceLastUri;
+  const ok=await playerCommand('auto_next',function(){return {path:withPlaybackTarget('/me/player/next'),method:'POST'};});
+  if(ok)setTimeout(async function(){await playerCommand('auto_play',function(){return {path:withPlaybackTarget('/me/player/play'),method:'PUT'};});fetchState();},350);
+}
+async function detailPlayAll(){
+  if(!state.detail)return false;
+  if(state.detail.type==='artist'){
+    const uris=(state.detail.tracks||[]).map(function(track){return track.uri;}).filter(Boolean);
+    return uris.length?playUris(uris):playArtist(state.detail.uri);
+  }
+  return playContextUri(state.detail.uri);
+}
+async function shuffleLiked(){
+  if(!_likedUris.length){toast('Open Library first','error');return false;}
+  const shuffled=_likedUris.slice().sort(function(){return Math.random()-.5;}),ok=await playUris(shuffled);
+  if(ok)toast('Shuffling liked songs','success');
+  return ok;
+}
+async function transferTo(deviceId){
+  const ok=await playerCommand('transfer',function(){return {path:'/me/player',method:'PUT',body:{device_ids:[deviceId],play:state.isPlaying}};});
+  if(!ok)return false;
+  setPreferredTarget('remote',deviceId);state.activeDeviceId=deviceId;closeModal();setTimeout(fetchState,500);toast('Device selected','success');return true;
+}
+function setupMediaSession(){
+  if(!('mediaSession'in navigator))return;
+  const safe=function(fn){try{fn();}catch{}};
+  safe(function(){navigator.mediaSession.setActionHandler('play',function(){togglePlay(true);});});
+  safe(function(){navigator.mediaSession.setActionHandler('pause',function(){togglePlay(false);});});
+  safe(function(){navigator.mediaSession.setActionHandler('previoustrack',prevTrack);});
+  safe(function(){navigator.mediaSession.setActionHandler('nexttrack',nextTrack);});
+  safe(function(){navigator.mediaSession.setActionHandler('seekto',function(details){if(!details.fastSeek)seekTo((details.seekTime||0)*1000);});});
+  safe(function(){navigator.mediaSession.setActionHandler('seekbackward',function(details){seekTo(Math.max(0,state.localProgress-(details.seekOffset||10)*1000));});});
+  safe(function(){navigator.mediaSession.setActionHandler('seekforward',function(details){seekTo(Math.min(state.localDuration||0,state.localProgress+(details.seekOffset||10)*1000));});});
+}
+// ==== CLEANPLAY V3: PERSISTENT SLEEP TIMER ===================================
+function persistSleepTimer(){
+  try{
+    if(state.sleepTimerEnd>0)localStorage.setItem(KEYS.sleepTimerEnd,String(state.sleepTimerEnd));
+    else localStorage.removeItem(KEYS.sleepTimerEnd);
+  }catch{}
+}
+function updateSleepStatus(){
+  const label=document.getElementById('sleep-status');if(!label)return;
+  if(!state.sleepTimerEnd){label.textContent='Off';return;}
+  const remaining=state.sleepTimerEnd-Date.now();
+  label.textContent=remaining>0?Math.ceil(remaining/60000)+' min remaining':'Finishing...';
+}
+function restoreSleepTimer(){
+  const stored=parseInt(localStorage.getItem(KEYS.sleepTimerEnd)||'0',10);
+  state.sleepTimerEnd=Number.isFinite(stored)&&stored>0?stored:0;
+  state._sleepExpiredPending=state.sleepTimerEnd>0&&state.sleepTimerEnd<=Date.now();
+  state.playbackHydrated=false;
+  if(!state.sleepTimerEnd)persistSleepTimer();
+  clearInterval(state.sleepTimerInterval);
+  state.sleepTimerInterval=setInterval(updateSleepStatus,30000);
+  updateSleepStatus();
+}
+async function restoreFadeVolume(){
+  if(state._fadeStartVol==null)return;
+  const volume=state._fadeStartVol;
+  state._fadeStartVol=null;state._fadeLastSent=null;
+  const ok=await playerCommand('volume',function(){return {path:withPlaybackTarget('/me/player/volume?volume_percent='+volume),method:'PUT'};});
+  if(ok){
+    state.confirmedVolume=volume;
+    const slider=document.getElementById('volume-slider'),pct=document.getElementById('vol-pct');
+    if(slider)slider.value=volume;if(pct)pct.textContent=volume;
+  }
+}
+function setSleepTimer(minutes){
+  restoreFadeVolume();
+  state._sleepFinishing=false;
+  state._sleepExpiredPending=false;
+  if(minutes===0){
+    state.sleepTimerEnd=0;persistSleepTimer();updateSleepStatus();closeModal();toast('Sleep timer off','success');return;
+  }
+  state.sleepTimerEnd=Date.now()+minutes*60000;
+  persistSleepTimer();updateSleepStatus();closeModal();toast('Sleep timer set for '+minutes+' minutes','success');
+}
+async function finishSleepTimer(){
+  if(state._sleepFinishing)return false;
+  if(!state.playbackHydrated){state._sleepExpiredPending=true;return false;}
+  state._sleepFinishing=true;
+  const ok=!state.isPlaying||await playerCommand('sleep_pause',function(){return {path:withPlaybackTarget('/me/player/pause'),method:'PUT'};});
+  if(!ok){
+    state._sleepExpiredPending=true;
+    toast('Sleep timer ended, but the player did not respond','error');
+    state._sleepFinishing=false;
+    return false;
+  }
+  state._sleepExpiredPending=false;
+  state.isPlaying=false;updateControls();
+  toast('Sleep timer paused playback','success');
+  state.sleepTimerEnd=0;persistSleepTimer();updateSleepStatus();
+  setTimeout(restoreFadeVolume,1000);
+  state._sleepFinishing=false;
+  return true;
+}
+function startProgressTick(){
+  clearInterval(state.progressTimer);
+  state.progressTimer=setInterval(async function(){
+    if(state.isPlaying&&state.localDuration){
+      state.localProgress=Math.min(state.localDuration,state.localProgress+1000);
+      updateProgress();updateLyricsHighlight();
+    }
+    if(!state.sleepTimerEnd)return;
+    const remaining=state.sleepTimerEnd-Date.now();
+    if(remaining<=0){if(!state._sleepExpiredPending)await finishSleepTimer();return;}
+    if(remaining<=30000&&state.isPlaying&&state.supportsVolume!==false){
+      if(state._fadeStartVol==null){
+        const sliderVolume=Number.parseInt(document.getElementById('volume-slider').value);
+        state._fadeStartVol=Number.isFinite(state.confirmedVolume)?state.confirmedVolume:(Number.isFinite(sliderVolume)?sliderVolume:80);
+      }
+      const target=Math.max(5,Math.round(state._fadeStartVol*remaining/30000));
+      if(target!==state._fadeLastSent&&(!state._fadeSentAt||Date.now()-state._fadeSentAt>4000)){
+        state._fadeLastSent=target;state._fadeSentAt=Date.now();
+        const ok=await playerCommand('volume',function(){return {path:withPlaybackTarget('/me/player/volume?volume_percent='+target),method:'PUT'};});
+        if(ok){
+          const slider=document.getElementById('volume-slider'),pct=document.getElementById('vol-pct');
+          if(slider&&document.activeElement!==slider)slider.value=target;
+          if(pct)pct.textContent=target;
+        }
+      }
+    }
+  },1000);
+}
+// ==== CLEANPLAY V3: DEVICE-LOCAL LISTEN LATER ================================
+KEYS.saved = 'cp_saved_v1';
+state.savedFilter = 'all';
+const SAVED_SCHEMA_VERSION = 1;
+const SAVED_LIMIT = 300;
+const savedCandidateCache = new Map();
+
+function savedText(value,max){
+  return String(value??'').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,max||180);
+}
+function sanitizeSavedItem(item){
+  if(!item || !['track','album','artist','playlist'].includes(item.type)) return null;
+  const uri=savedText(item.uri,180);
+  if(!uri.startsWith('spotify:'+item.type+':')||!/^spotify:(track|album|artist|playlist):[A-Za-z0-9]+$/.test(uri)) return null;
+  const rawSavedAt=Number(item.savedAt),savedAt=Number.isFinite(rawSavedAt)?Math.min(Date.now()+60000,Math.max(0,Math.floor(rawSavedAt))):Date.now();
+  return {type:item.type,uri:uri,name:savedText(item.name,180)||'Untitled',subtitle:savedText(item.subtitle,220),meta:savedText(item.meta,220),durationMs:Number.isFinite(Number(item.durationMs))?Math.max(0,Number(item.durationMs)):0,savedAt:savedAt};
+}
+function readSavedLibrary(){
+  try{
+    const parsed=JSON.parse(localStorage.getItem(KEYS.saved)||'null');
+    const source=Array.isArray(parsed)?parsed:(parsed&&parsed.version===SAVED_SCHEMA_VERSION?parsed.items:[]);
+    const seen=new Set(),items=[];
+    for(const raw of Array.isArray(source)?source:[]){
+      const item=sanitizeSavedItem(raw),key=item&&item.type+'|'+item.uri;
+      if(!item||seen.has(key))continue;
+      seen.add(key);items.push(item);
+      if(items.length>=SAVED_LIMIT)break;
+    }
+    return items;
+  }catch{return [];}
+}
+function writeSavedLibrary(items){
+  const clean=[],seen=new Set();
+  for(const raw of Array.isArray(items)?items:[]){
+    const item=sanitizeSavedItem(raw),key=item&&item.type+'|'+item.uri;
+    if(!item||seen.has(key))continue;
+    seen.add(key);clean.push(item);
+    if(clean.length>=SAVED_LIMIT)break;
+  }
+  try{localStorage.setItem(KEYS.saved,JSON.stringify({version:SAVED_SCHEMA_VERSION,items:clean,updatedAt:Date.now()}));return true;}
+  catch{toast('Listen Later could not be saved on this device','error');return false;}
+}
+function savedItemFromEntity(entity,type){
+  if(!entity||!entity.uri)return null;
+  let subtitle='',meta='',durationMs=0;
+  if(type==='track'){subtitle=(entity.artists||[]).map(function(a){return a.name;}).join(', ');meta=entity.album&&entity.album.name||'';durationMs=entity.duration_ms||0;}
+  else if(type==='album'){subtitle=(entity.artists||[]).map(function(a){return a.name;}).join(', ');meta=[entity.release_date&&String(entity.release_date).slice(0,4),entity.total_tracks?entity.total_tracks+' tracks':''].filter(Boolean).join(' - ');}
+  else if(type==='artist'){subtitle=(entity.genres||[]).slice(0,3).join(' - ')||'Artist';meta=entity.followers&&entity.followers.total?entity.followers.total.toLocaleString()+' followers':'';}
+  else if(type==='playlist'){const total=entity.items?.total??entity.tracks?.total;subtitle=entity.owner&&entity.owner.display_name||'Playlist';meta=Number.isFinite(total)?total+' tracks':'';}
+  return sanitizeSavedItem({type:type,uri:entity.uri,name:entity.name,subtitle:subtitle,meta:meta,durationMs:durationMs,savedAt:Date.now()});
+}
+function isSaved(type,uri){return readSavedLibrary().some(function(item){return item.type===type&&item.uri===uri;});}
+function registerSavedCandidate(item){
+  const clean=sanitizeSavedItem(item);if(!clean)return null;
+  savedCandidateCache.delete(clean.uri);savedCandidateCache.set(clean.uri,clean);
+  if(savedCandidateCache.size>750)savedCandidateCache.delete(savedCandidateCache.keys().next().value);
+  return clean;
+}
+function syncSavedActionButtons(type,uri){
+  const saved=isSaved(type,uri);
+  document.querySelectorAll('.listen-later-action[data-saved-uri="'+uri+'"]').forEach(function(button){
+    button.classList.toggle('saved',saved);button.title=saved?'Saved for later':'Listen later';
+    button.setAttribute('aria-label',(saved?'Remove from':'Save to')+' Listen Later');
+    const mark=button.querySelector('span');if(mark)mark.textContent=saved?'✓':'+';
+  });
+}
+function toggleSavedItem(item,event){
+  if(event)event.stopPropagation();
+  const clean=sanitizeSavedItem(item);if(!clean)return false;
+  const items=readSavedLibrary(),key=clean.type+'|'+clean.uri;
+  const index=items.findIndex(function(existing){return existing.type+'|'+existing.uri===key;}),removing=index>=0;
+  if(removing)items.splice(index,1);else items.unshift(Object.assign({},clean,{savedAt:Date.now()}));
+  if(!writeSavedLibrary(items))return false;
+  renderSavedLibrary();syncSavedActionButtons(clean.type,clean.uri);updateNowPlayingSave();updateContextSaveBtn();if(state.detail)updateDetailSaveBtn();
+  toast(removing?'Removed from Listen Later':'Saved for later','success');return true;
+}
+function toggleSavedCandidate(uri,event){if(event)event.stopPropagation();const item=savedCandidateCache.get(uri);if(item)toggleSavedItem(item,event);}
+function removeSaved(type,uri,event){if(event)event.stopPropagation();const item=readSavedLibrary().find(function(entry){return entry.type===type&&entry.uri===uri;});if(item)toggleSavedItem(item,event);}
+function savedActionButton(item){
+  const clean=registerSavedCandidate(item);if(!clean)return '';
+  const saved=isSaved(clean.type,clean.uri);
+  return '<button class="icon-btn listen-later-action '+(saved?'saved':'')+'" data-saved-uri="'+clean.uri+'" type="button" onclick="event.stopPropagation();toggleSavedCandidate(\''+clean.uri+'\',event)" aria-label="'+(saved?'Remove from':'Save to')+' Listen Later" title="'+(saved?'Saved for later':'Listen later')+'"><span aria-hidden="true">'+(saved?'&#10003;':'+')+'</span></button>';
+}
+function trackActionsHtml(track){
+  const queueSvg='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h10v-2H7v2zm0 4h10v-2H7v2zM7 7v2h14V7H7zm12 4h-2v2h-2v2h2v2h2v-2h2v-2h-2z"/></svg>';
+  return '<div class="item-actions"><button class="icon-btn" type="button" onclick="event.stopPropagation();addToQueue(\''+track.uri+'\',event)" aria-label="Add to queue" title="Add to queue">'+queueSvg+'</button>'+savedActionButton(savedItemFromEntity(track,'track'))+'</div>';
+}
+function renderArtistItem(artist,index){
+  const item=savedItemFromEntity(artist,'artist');registerSavedCandidate(item);
+  return '<div class="item" onclick="openDetail(\'artist\',\''+artist.id+'\',\''+escapeAttr(artist.name)+'\',\''+artist.uri+'\')"><div class="item-num">'+String(index+1).padStart(2,'0')+'</div><div class="item-content"><div class="item-title italic">'+escapeHtml(artist.name)+'</div><div class="item-subtitle">'+escapeHtml((artist.genres||[]).slice(0,3).join(' - ')||'Artist')+'</div><div class="item-meta">'+(artist.followers&&artist.followers.total?artist.followers.total.toLocaleString()+' followers':'')+'</div></div><div class="item-actions">'+savedActionButton(item)+'</div></div>';
+}
+function renderAlbumItem(album,index){
+  const item=savedItemFromEntity(album,'album');registerSavedCandidate(item);
+  return '<div class="item" onclick="openDetail(\'album\',\''+album.id+'\',\''+escapeAttr(album.name)+'\',\''+album.uri+'\')"><div class="item-num">'+String(index+1).padStart(2,'0')+'</div><div class="item-content"><div class="item-title italic">'+escapeHtml(album.name)+'</div><div class="item-subtitle">'+escapeHtml((album.artists||[]).map(function(a){return a.name;}).join(', '))+'</div><div class="item-meta">'+escapeHtml([album.album_type,album.total_tracks?album.total_tracks+' tracks':'',album.release_date&&album.release_date.slice(0,4)].filter(Boolean).join(' - '))+'</div></div><div class="item-actions">'+savedActionButton(item)+'</div></div>';
+}
+function renderPlaylistItem(playlist,index){
+  const item=savedItemFromEntity(playlist,'playlist');registerSavedCandidate(item);
+  const total=playlist.items?.total??playlist.tracks?.total??0;
+  return '<div class="item" onclick="openDetail(\'playlist\',\''+playlist.id+'\',\''+escapeAttr(playlist.name)+'\',\''+playlist.uri+'\')"><div class="item-num">'+String(index+1).padStart(2,'0')+'</div><div class="item-content"><div class="item-title italic">'+escapeHtml(playlist.name)+'</div><div class="item-subtitle">'+escapeHtml(playlist.owner&&playlist.owner.display_name||'')+'</div><div class="item-meta">'+total+' tracks</div></div><div class="item-actions">'+savedActionButton(item)+'</div></div>';
+}
+function setSavedFilter(filter){
+  state.savedFilter=['all','track','album','artist','playlist'].includes(filter)?filter:'all';
+  document.querySelectorAll('[data-saved-filter]').forEach(function(button){button.classList.toggle('active',button.dataset.savedFilter===state.savedFilter);});
+  renderSavedLibrary();
+}
+function openSavedItem(uri){const item=savedCandidateCache.get(uri)||readSavedLibrary().find(function(entry){return entry.uri===uri;});if(!item)return;if(item.type==='track')playUri(item.uri,null);else openDetail(item.type,item.uri.split(':').pop(),item.name,item.uri);}
+async function playSavedContext(uri){
+  if(typeof playContextUri==='function')return playContextUri(uri);
+  activateSdkAudio();const result=await api('/me/player/play'+devQS(false),'PUT',{context_uri:uri});
+  if(result!==null){setTimeout(fetchState,700);switchView('now-playing');}
+}
+function playSavedItem(uri,event){if(event)event.stopPropagation();const item=savedCandidateCache.get(uri)||readSavedLibrary().find(function(entry){return entry.uri===uri;});if(!item)return;if(item.type==='track')playUri(item.uri,null);else if(item.type==='artist')playArtist(item.uri);else playSavedContext(item.uri);}
+function renderSavedLibrary(){
+  const host=document.getElementById('saved-local-list');if(!host)return;
+  const all=readSavedLibrary(),items=state.savedFilter==='all'?all:all.filter(function(item){return item.type===state.savedFilter;});
+  if(!items.length){host.innerHTML='<div class="saved-empty">'+(all.length?'Nothing in this filter yet.':'Nothing saved yet. Use + beside any result, or save what is playing.')+'</div>';return;}
+  let html='';
+  ['track','album','artist','playlist'].forEach(function(type){
+    const group=items.filter(function(item){return item.type===type;});if(!group.length)return;
+    const heading=type==='track'?'Tracks':type==='album'?'Albums':type==='artist'?'Artists':'Playlists';
+    html+='<div class="list-section"><div class="list-section-title">'+heading+' <span class="list-section-count">'+group.length+'</span></div></div>';
+    html+=group.map(function(item,index){
+      registerSavedCandidate(item);
+      return '<div class="item" onclick="openSavedItem(\''+item.uri+'\')"><div class="item-num">'+String(index+1).padStart(2,'0')+'</div><div class="item-content"><div class="item-title '+(item.type==='track'?'':'italic')+'">'+escapeHtml(item.name)+'</div><div class="item-subtitle">'+escapeHtml(item.subtitle)+'</div><div class="item-meta">'+escapeHtml(item.meta||item.type)+'</div></div><div class="item-actions"><button class="icon-btn" type="button" onclick="playSavedItem(\''+item.uri+'\',event)" aria-label="Play or open">&#9654;</button><button class="icon-btn item-remove" type="button" onclick="removeSaved(\''+item.type+'\',\''+item.uri+'\',event)" aria-label="Remove from Listen Later">&times;</button></div></div>';
+    }).join('');
+  });
+  host.innerHTML=html;
+}
+function updateNowPlayingSave(){
+  const button=document.getElementById('np-save'),label=document.getElementById('np-save-label');if(!button)return;
+  const item=savedItemFromEntity(state.currentTrack,'track');if(!item){button.style.display='none';return;}
+  button.style.display='inline-flex';const saved=isSaved('track',item.uri);button.classList.toggle('saved',saved);button.setAttribute('aria-pressed',String(saved));if(label)label.textContent=saved?'Saved for later':'Listen later';
+}
+function toggleNowPlayingSave(){const item=savedItemFromEntity(state.currentTrack,'track');if(item)toggleSavedItem(item);}
+function contextSavedItem(){
+  if(!state.currentContextUri)return null;
+  return sanitizeSavedItem({type:state.currentContextType,uri:state.currentContextUri,name:state.currentContextName||state.currentContextType,subtitle:state.currentContextOwner||((state.currentTrack&&state.currentTrack.artists)||[]).map(function(a){return a.name;}).join(', '),meta:state.currentContextTracks?state.currentContextTracks.length+' tracks':'',savedAt:Date.now()});
+}
+function updateContextSaveBtn(){const button=document.getElementById('np-ctx-save'),item=contextSavedItem();if(!button||!item){if(button)button.classList.remove('show','liked');return;}const saved=isSaved(item.type,item.uri);button.classList.add('show');button.classList.toggle('liked',saved);button.title=saved?'Remove from Listen Later':'Save to Listen Later';button.setAttribute('aria-label',button.title);}
+async function toggleContextSave(){const item=contextSavedItem();if(item)toggleSavedItem(item);}
+async function detailToggleSave(){
+  if(!state.detail)return;
+  const item=sanitizeSavedItem({type:state.detail.type,uri:state.detail.uri,name:state.detail.name||document.getElementById('detail-title').textContent,subtitle:document.getElementById('detail-subtitle').textContent,meta:state.detail.tracks&&state.detail.tracks.length?state.detail.tracks.length+' tracks':'',savedAt:Date.now()});
+  if(item){toggleSavedItem(item);state.detail.saved=isSaved(item.type,item.uri);updateDetailSaveBtn();}
+}
+function updateDetailSaveBtn(){
+  const button=document.getElementById('detail-save'),label=document.getElementById('detail-save-label');if(!button||!state.detail)return;
+  const supported=['album','artist','playlist'].includes(state.detail.type);button.style.display=supported?'inline-flex':'none';if(!supported)return;
+  const saved=isSaved(state.detail.type,state.detail.uri);state.detail.saved=saved;button.classList.toggle('liked',saved);button.setAttribute('aria-pressed',String(saved));if(label)label.textContent=saved?'Saved for later':'Listen later';
+}
+async function loadLibrary(){
+  renderSavedLibrary();const list=document.getElementById('library-list');list.innerHTML='<div class="empty"><span class="spinner"></span>loading Spotify library...</div>';
+  const responses=await Promise.all([api('/me/player/recently-played?limit=10','GET',null,{silent:true}),api('/me/tracks?limit=50','GET',null,{silent:true}),api('/me/playlists?limit=20','GET',null,{silent:true})]);
+  const recent=responses[0],liked=responses[1],playlists=responses[2];let html='';
+  if(recent&&recent.items&&recent.items.length){html+='<div class="list-section"><div class="list-section-title">Recently played <span class="list-section-count">'+recent.items.length+'</span></div></div>';html+=recent.items.map(function(entry,index){return renderTrackItem(entry.track,index);}).join('');}
+  if(liked&&liked.items&&liked.items.length){_likedUris=liked.items.map(function(entry){return entry.track&&entry.track.uri;}).filter(Boolean);html+='<div class="list-section"><div class="list-section-title"><span>Liked songs <span class="list-section-count">'+(liked.total||liked.items.length)+'</span></span><button class="up-next-link" onclick="shuffleLiked()">Shuffle</button></div></div>';html+=liked.items.map(function(entry,index){return renderTrackItem(entry.track,index);}).join('');}
+  if(playlists&&playlists.items&&playlists.items.length){html+='<div class="list-section"><div class="list-section-title">Your playlists <span class="list-section-count">'+(playlists.total||playlists.items.length)+'</span></div></div>';html+=playlists.items.filter(Boolean).map(function(playlist,index){return renderPlaylistItem(playlist,index);}).join('');}
+  list.innerHTML=html||'<div class="empty">Spotify library is empty or unavailable.</div>';
+}
+
+// ==== CLEANPLAY V3: PRIVATE, DEVICE-LOCAL DIAGNOSTICS =========================
+KEYS.diagnostics = 'cp_diag_v1';
+const DIAGNOSTIC_SCHEMA_VERSION = 1;
+const DIAGNOSTIC_LIMIT = 250;
+const DIAGNOSTIC_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const DIAGNOSTIC_CATEGORIES = new Set(['auth','network','api','sdk','lifecycle','recovery','playback','other']);
+const DIAGNOSTIC_EVENTS = new Set(['refresh_start','refresh_ok','refresh_transient','refresh_invalid','oauth_state_mismatch','api_ok','api_error','offline','online','sdk_load','sdk_connect','sdk_ready','sdk_not_ready','sdk_auth_error','sdk_rebuild','hidden','visible','pageshow','resume_start','resume_ok','resume_degraded','device_reconcile','command_retry','command_ok','command_failed','other']);
+const DIAGNOSTIC_REASONS = new Set(['wake','gesture','auth','not_ready','null_state','online','pageshow','visible','device_missing','token_expired','manual','none']);
+const DIAGNOSTIC_TARGETS = new Set(['here','remote','none']);
+const DIAGNOSTIC_OUTCOMES = new Set(['ok','retry','failed','degraded','none']);
+
+function diagnosticEnum(value, allowed, fallback){
+  const normalized=String(value||'').toLowerCase();
+  return allowed.has(normalized)?normalized:fallback;
+}
+function sanitizeDiagnosticEntry(raw){
+  if(!raw||typeof raw!=='object')return null;
+  const ts=Number(raw.ts);
+  if(!Number.isFinite(ts)||ts<Date.now()-DIAGNOSTIC_RETENTION_MS||ts>Date.now()+60000)return null;
+  const status=Number(raw.status),attempt=Number(raw.attempt);
+  return {
+    ts:Math.floor(ts),
+    category:diagnosticEnum(raw.category,DIAGNOSTIC_CATEGORIES,'other'),
+    event:diagnosticEnum(raw.event,DIAGNOSTIC_EVENTS,'other'),
+    status:Number.isInteger(status)&&status>=100&&status<=599?status:0,
+    attempt:Number.isInteger(attempt)&&attempt>=0&&attempt<=20?attempt:0,
+    reason:diagnosticEnum(raw.reason,DIAGNOSTIC_REASONS,'none'),
+    target:diagnosticEnum(raw.target,DIAGNOSTIC_TARGETS,'none'),
+    outcome:diagnosticEnum(raw.outcome,DIAGNOSTIC_OUTCOMES,'none'),
+    online:raw.online!==false,
+    visibility:raw.visibility==='hidden'?'hidden':'visible'
+  };
+}
+function readDiagnostics(){
+  try{
+    const parsed=JSON.parse(localStorage.getItem(KEYS.diagnostics)||'null');
+    if(!parsed||parsed.version!==DIAGNOSTIC_SCHEMA_VERSION||!Array.isArray(parsed.events))return [];
+    return parsed.events.map(sanitizeDiagnosticEntry).filter(Boolean).sort(function(a,b){return a.ts-b.ts;}).slice(-DIAGNOSTIC_LIMIT);
+  }catch{return [];}
+}
+function writeDiagnostics(events){
+  const clean=(Array.isArray(events)?events:[]).map(sanitizeDiagnosticEntry).filter(Boolean).slice(-DIAGNOSTIC_LIMIT);
+  try{
+    localStorage.setItem(KEYS.diagnostics,JSON.stringify({version:DIAGNOSTIC_SCHEMA_VERSION,events:clean,updatedAt:Date.now()}));
+    return true;
+  }catch{return false;}
+}
+function logDiagnostic(event,fields){
+  const safe=fields&&typeof fields==='object'?fields:{};
+  const entry=sanitizeDiagnosticEntry({
+    ts:Date.now(),category:safe.category,event:event,status:safe.status,attempt:safe.attempt,
+    reason:safe.reason,target:safe.target,outcome:safe.outcome,
+    online:navigator.onLine!==false,visibility:document.visibilityState
+  });
+  const events=readDiagnostics();
+  events.push(entry);
+  writeDiagnostics(events);
+  if(document.getElementById('view-settings')?.classList.contains('active'))renderDiagnostics();
+  return entry;
+}
+function recordDiagnostic(category,event,detailObj){
+  const safe=detailObj&&typeof detailObj==='object'?detailObj:{};
+  return logDiagnostic(event,{category:category,status:safe.status,attempt:safe.attempt,reason:safe.reason,target:safe.target,outcome:safe.outcome});
+}
+function diagnosticsExportText(){
+  return JSON.stringify({version:DIAGNOSTIC_SCHEMA_VERSION,exportedAt:new Date().toISOString(),retentionDays:7,events:readDiagnostics()},null,2);
+}
+function renderDiagnostics(){
+  const preview=document.getElementById('diag-preview');
+  if(!preview)return;
+  const events=readDiagnostics();
+  preview.textContent=events.length?events.slice(-40).reverse().map(function(entry){
+    const parts=[new Date(entry.ts).toISOString(),entry.category+'/'+entry.event];
+    if(entry.outcome!=='none')parts.push(entry.outcome);
+    if(entry.reason!=='none')parts.push(entry.reason);
+    if(entry.status)parts.push('HTTP '+entry.status);
+    if(entry.attempt)parts.push('attempt '+entry.attempt);
+    parts.push(entry.target,entry.online?'online':'offline',entry.visibility);
+    return parts.join(' | ');
+  }).join('\n'):'No diagnostics yet.';
+}
+async function copyDiagnostics(){
+  const value=diagnosticsExportText();
+  try{
+    if(!navigator.clipboard||!navigator.clipboard.writeText)throw new Error('clipboard unavailable');
+    await navigator.clipboard.writeText(value);
+    toast('Private diagnostics copied','success');
+  }catch{
+    const input=document.createElement('textarea');
+    input.value=value;input.setAttribute('readonly','');input.style.position='fixed';input.style.opacity='0';
+    document.body.appendChild(input);input.select();
+    const copied=document.execCommand&&document.execCommand('copy');input.remove();
+    toast(copied?'Private diagnostics copied':'Could not copy diagnostics',copied?'success':'error');
+  }
+}
+function clearDiagnostics(){
+  localStorage.removeItem(KEYS.diagnostics);
+  renderDiagnostics();
+  toast('Private diagnostics cleared','success');
+}
+const CONNECTION_HEALTH_COPY = {
+  healthy:['Connection looks healthy','Spotify and a playback route are available.'],
+  ready:['Spotify is connected','Choose a device or start playback when you are ready.'],
+  recovering:['Restoring connection','CleanPlay is checking the session and playback route.'],
+  offline:['You appear to be offline','Reconnect to the internet, then return to CleanPlay.'],
+  signed_out:['Spotify sign-in required','Connect your Spotify account to resume.'],
+  degraded:['Connection needs attention','Open Devices or retry the last playback action.']
+};
+function updateConnectionHealth(status){
+  const key=Object.prototype.hasOwnProperty.call(CONNECTION_HEALTH_COPY,status)?status:'degraded';
+  const summary=document.getElementById('health-summary'),detail=document.getElementById('health-detail'),dot=document.getElementById('health-dot');
+  if(summary)summary.textContent=CONNECTION_HEALTH_COPY[key][0];
+  if(detail)detail.textContent=CONNECTION_HEALTH_COPY[key][1];
+  if(dot){dot.classList.toggle('live',key==='healthy'||key==='ready');dot.classList.toggle('error',key==='offline'||key==='degraded');}
+  return key;
+}
+function refreshConnectionHealth(){
+  if(navigator.onLine===false)return updateConnectionHealth('offline');
+  if(!state.accessToken)return updateConnectionHealth('signed_out');
+  if(state._recovering)return updateConnectionHealth('recovering');
+  if(state.activeDeviceId||state.currentTrackUri||state.isPlaying)return updateConnectionHealth('healthy');
+  return updateConnectionHealth('ready');
+}
+function updateHealthSummary(status){return status?updateConnectionHealth(status):refreshConnectionHealth();}
+
+// ==== CLEANPLAY V3: RESILIENT AUTH OVERRIDES (1/2) ===========================
+function authDiagnostic(event,fields){
+  if(typeof logDiagnostic==='function')logDiagnostic(event,{category:'auth',...(fields||{})});
+}
+function timingSafeTokenEqual(left,right){
+  const a=new TextEncoder().encode(String(left||'')),b=new TextEncoder().encode(String(right||''));
+  let diff=a.length^b.length;
+  for(let i=0;i<128;i++)diff|=(a[i]||0)^(b[i]||0);
+  return a.length>0&&diff===0;
+}
+function accountLockMatches(expected,candidate){
+  if(!expected||!candidate)return false;
+  return timingSafeTokenEqual(expected,candidate)||timingSafeTokenEqual(String(expected).toLowerCase(),String(candidate).toLowerCase());
+}
+function clearOAuthAttempt(){
+  localStorage.removeItem(KEYS.codeVerifier);
+  localStorage.removeItem(KEYS.oauthState);
+}
+function clearAuthTokens(){
+  state.accessToken=null;state.refreshToken=null;state.tokenExpires=0;state.authIssuedAt=0;
+  localStorage.removeItem(KEYS.accessToken);
+  localStorage.removeItem(KEYS.refreshToken);
+  localStorage.removeItem(KEYS.tokenExpires);
+  localStorage.removeItem(KEYS.authIssuedAt);
+}
+function endAuthorizedSession(){
+  if(typeof stopPolling==='function')stopPolling();
+  clearInterval(state.pollTimer);clearInterval(state.progressTimer);
+  if(state.sleepTimerInterval){clearInterval(state.sleepTimerInterval);state.sleepTimerInterval=null;}
+  state.sleepTimerEnd=0;
+  state._sleepExpiredPending=false;
+  state._authEpoch=(state._authEpoch||0)+1;
+  try{localStorage.removeItem(KEYS.sleepTimerEnd);}catch{}
+  if(typeof disconnectWebPlayer==='function')disconnectWebPlayer();
+  else if(state.webPlayer){try{state.webPlayer.disconnect();}catch{}state.webPlayer=null;}
+  state.cleanplayDeviceId=null;state.sdkReady=false;state.sdkActivated=false;state.activeDeviceId=null;state.user=null;
+  clearAuthTokens();
+}
+function requireSpotifyReconnect(message){
+  endAuthorizedSession();showSetup();setAuthStatus(message,'error');
+  if(typeof updateConnectionHealth==='function')updateConnectionHealth('signed_out');
+}
+function signOut(){
+  endAuthorizedSession();clearOAuthAttempt();showSetup();
+  setAuthStatus('Signed out. Your preferences and Listen Later items are still on this device.');
+  if(typeof updateConnectionHealth==='function')updateConnectionHealth('signed_out');
+}
+async function startAuth(){
+  const clientId=document.getElementById('client-id-input').value.trim();
+  const userId=document.getElementById('user-id-input').value.trim();
+  if(!clientId){setAuthStatus('Paste your Client ID first.','error');return;}
+  localStorage.setItem(KEYS.clientId,clientId);
+  const existingLock=String(localStorage.getItem(KEYS.expectedUserId)||'').trim();
+  if(!existingLock){
+    if(userId)localStorage.setItem(KEYS.expectedUserId,userId);else localStorage.removeItem(KEYS.expectedUserId);
+  }
+  setAuthStatus('Redirecting to Spotify...');
+  const verifier=genRandomString(64),oauthState=genRandomString(48);
+  try{
+    const challenge=await pkceChallenge(verifier);
+    localStorage.setItem(KEYS.codeVerifier,verifier);
+    localStorage.setItem(KEYS.oauthState,oauthState);
+    const params=new URLSearchParams({response_type:'code',client_id:clientId,scope:SCOPES,redirect_uri:REDIRECT_URI,state:oauthState,code_challenge_method:'S256',code_challenge:challenge});
+    window.location='https://accounts.spotify.com/authorize?'+params.toString();
+  }catch{
+    clearOAuthAttempt();setAuthStatus('Could not start secure sign-in. Try again.','error');
+  }
+}
+async function handleAuthCallback(){
+  const params=new URLSearchParams(window.location.search),code=params.get('code'),error=params.get('error');
+  if(code===null&&error===null)return false;
+  const verifier=localStorage.getItem(KEYS.codeVerifier);
+  const stateIsValid=timingSafeTokenEqual(localStorage.getItem(KEYS.oauthState),params.get('state'));
+  clearOAuthAttempt();window.history.replaceState(null,null,REDIRECT_URI);
+  if(!stateIsValid){
+    authDiagnostic('oauth_state_mismatch',{reason:'auth',outcome:'failed'});
+    showSetup();setAuthStatus('Secure sign-in check failed. Start the Spotify connection again.','error');return false;
+  }
+  if(error){
+    showSetup();setAuthStatus(error==='access_denied'?'Spotify sign-in was cancelled.':'Spotify could not authorize CleanPlay. Try again.','error');return false;
+  }
+  const clientId=localStorage.getItem(KEYS.clientId);
+  if(!verifier||!clientId){
+    showSetup();setAuthStatus('Secure sign-in expired. Start the connection again.','error');return false;
+  }
+  state.clientId=clientId;setAuthStatus('Finishing secure sign-in...');
+  try{
+    const response=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:REDIRECT_URI,client_id:clientId,code_verifier:verifier})});
+    if(!response.ok)throw new Error('oauth_exchange_failed');
+    saveTokens(await response.json(),Date.now());
+    if(!await verifyUser())return false;
+    showApp();return true;
+  }catch{
+    showSetup();setAuthStatus('Spotify sign-in could not finish. Check your connection and try again.','error');return false;
+  }
+}
+function saveTokens(data,authorizationIssuedAt){
+  if(!data||!data.access_token)throw new Error('missing_access_token');
+  state.accessToken=data.access_token;
+  if(data.refresh_token)state.refreshToken=data.refresh_token;
+  state.tokenExpires=Date.now()+((Number(data.expires_in)||3600)*1000)-60000;
+  localStorage.setItem(KEYS.accessToken,state.accessToken);
+  if(state.refreshToken)localStorage.setItem(KEYS.refreshToken,state.refreshToken);
+  localStorage.setItem(KEYS.tokenExpires,String(state.tokenExpires));
+  if(Number.isFinite(Number(authorizationIssuedAt))&&Number(authorizationIssuedAt)>0){
+    state.authIssuedAt=Number(authorizationIssuedAt);
+    localStorage.setItem(KEYS.authIssuedAt,String(state.authIssuedAt));
+  }
+}
+function refreshTokenFn(reason='token_expired'){
+  if(state._refreshPromise)return state._refreshPromise;
+  const refreshEpoch=state._authEpoch||0;
+  state._refreshPromise=(async function(){
+    authDiagnostic('refresh_start',{reason:reason,outcome:'retry'});
+    if(!state.refreshToken||!state.clientId){
+      authDiagnostic('refresh_invalid',{reason:'auth',outcome:'failed'});
+      requireSpotifyReconnect('Your Spotify connection is no longer usable. Reconnect to continue.');
+      return {status:'invalid_grant',reason:'missing_credentials'};
+    }
+    if(navigator.onLine===false){
+      authDiagnostic('refresh_transient',{reason:reason,outcome:'degraded'});
+      return {status:'transient',reason:'offline'};
+    }
+    try{
+      const response=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:state.refreshToken,client_id:state.clientId})});
+      let data={};try{data=await response.json();}catch{}
+      if(response.ok&&data.access_token){
+        if(refreshEpoch!==(state._authEpoch||0))return {status:'transient',reason:'cancelled'};
+        saveTokens(data);authDiagnostic('refresh_ok',{status:response.status,reason:reason,outcome:'ok'});
+        return {status:'success',reason:'refreshed'};
+      }
+      if(response.status===400&&data&&data.error==='invalid_grant'){
+        authDiagnostic('refresh_invalid',{status:response.status,reason:'auth',outcome:'failed'});
+        requireSpotifyReconnect('Your Spotify authorization has expired or was revoked. Reconnect to continue.');
+        return {status:'invalid_grant',reason:'invalid_grant'};
+      }
+      authDiagnostic('refresh_transient',{status:response.status,reason:reason,outcome:'degraded'});
+      return {status:'transient',reason:response.status>=500||response.status===429?'server':'oauth_response',httpStatus:response.status};
+    }catch{
+      authDiagnostic('refresh_transient',{reason:reason,outcome:'degraded'});
+      return {status:'transient',reason:navigator.onLine===false?'offline':'network'};
+    }
+  })().finally(function(){state._refreshPromise=null;});
+  return state._refreshPromise;
+}
+async function ensureToken(options){
+  const opts=options===true?{force:true}:options&&typeof options==='object'?options:{};
+  if(!opts.force&&state.accessToken&&Date.now()<state.tokenExpires)return true;
+  const result=await refreshTokenFn(opts.reason||'token_expired');
+  return result.status==='success';
+}
+
+// ==== CLEANPLAY V3: RESILIENT AUTH OVERRIDES (2/2) ===========================
+async function verifyUser(){
+  const me=await api('/me','GET',null,{silent:true});
+  if(!me){
+    if(state.refreshToken)setAuthStatus('Spotify could not verify the account right now. Your sign-in is still saved.','error');
+    return false;
+  }
+  const accountId=typeof me.account_id==='string'?me.account_id.trim():'';
+  const legacyId=typeof me.id==='string'?me.id.trim():'';
+  const preferredId=accountId||legacyId;
+  if(!preferredId){
+    setAuthStatus('Spotify did not return a usable account identifier. Try reconnecting.','error');
+    return false;
+  }
+  const expected=String(localStorage.getItem(KEYS.expectedUserId)||'').trim();
+  if(expected&&!accountLockMatches(expected,accountId)&&!accountLockMatches(expected,legacyId)){
+    authDiagnostic('other',{reason:'auth',outcome:'failed'});
+    requireSpotifyReconnect('This browser is locked to a different Spotify account. Sign in with the originally connected account. To deliberately change it, clear this site\'s data first.');
+    return false;
+  }
+  if(!expected)localStorage.setItem(KEYS.expectedUserId,preferredId);
+  state.user=me;
+  return true;
+}
+function verifyIdentityFirst(){return verifyUser();}
+async function api(path,method='GET',body=null,callerOpts){
+  const options=callerOpts&&typeof callerOpts==='object'?callerOpts:{},silent=!!options.silent,failureSink=options.failureSink;
+  const fail=function(status,kind){if(failureSink&&typeof failureSink==='object'){failureSink.status=status;failureSink.kind=kind;}};
+  if(!await ensureToken({reason:'token_expired'})){fail(401,'auth');return null;}
+  const request={method:method,headers:{Authorization:'Bearer '+state.accessToken}};
+  if(body){request.headers['Content-Type']='application/json';request.body=JSON.stringify(body);}
+  try{
+    const response=await fetch('https://api.spotify.com/v1'+path,request);
+    if(response.status===401){
+      fail(401,'auth');
+      if(typeof logDiagnostic==='function')logDiagnostic('api_error',{category:'api',status:401,reason:'auth',attempt:options._retried?2:1,outcome:options._retried?'failed':'retry'});
+      if(options._retried){
+        if(!silent)toast('Spotify rejected the refreshed session. Reconnect if this continues.','error');
+        return null;
+      }
+      const refreshed=await refreshTokenFn('auth');
+      if(refreshed.status==='success')return api(path,method,body,{...options,_retried:true});
+      if(refreshed.status==='transient'&&!silent)toast('Spotify is temporarily unreachable. Your sign-in is still saved.','error');
+      return null;
+    }
+    if(response.status===429){
+      fail(429,'rate_limit');
+      if(typeof logDiagnostic==='function')logDiagnostic('api_error',{category:'api',status:429,reason:'manual',outcome:'degraded'});
+      if(!silent)toast('Rate-limited - slow down','error');
+      return null;
+    }
+    if(response.status===403){
+      fail(403,'forbidden');
+      let message='';try{const errorBody=await response.json();message=errorBody&&errorBody.error&&errorBody.error.message||'';}catch{}
+      if(typeof logDiagnostic==='function')logDiagnostic('api_error',{category:'api',status:403,reason:'manual',outcome:'failed'});
+      if(!silent)toast(/premium/i.test(message)?'Premium required for this action':'Restricted by Spotify','error');
+      return null;
+    }
+    if(response.status===204)return {};
+    if(!response.ok){
+      fail(response.status,'api');
+      if(typeof logDiagnostic==='function')logDiagnostic('api_error',{category:'api',status:response.status,reason:'manual',outcome:'failed'});
+      if(!silent)toast('Spotify request failed ('+response.status+')','error');
+      return null;
+    }
+    const text=await response.text();
+    if(!text)return {};
+    try{return JSON.parse(text);}catch{return {};}
+  }catch{
+    fail(0,'network');
+    if(typeof logDiagnostic==='function')logDiagnostic('api_error',{category:'network',reason:'manual',outcome:'degraded'});
+    if(!silent)toast(navigator.onLine===false?'You are offline':'Network error - your sign-in is still saved','error');
+    return null;
+  }
+}
+async function decideNextScreen(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.has('code')||params.has('error')){
+    const handled=await handleAuthCallback();
+    if(handled)return;
+  }
+  state.clientId=localStorage.getItem(KEYS.clientId);
+  state.accessToken=localStorage.getItem(KEYS.accessToken);
+  state.refreshToken=localStorage.getItem(KEYS.refreshToken);
+  state.tokenExpires=parseInt(localStorage.getItem(KEYS.tokenExpires)||'0',10)||0;
+  state.authIssuedAt=parseInt(localStorage.getItem(KEYS.authIssuedAt)||'0',10)||0;
+  if(state.clientId&&(state.accessToken||state.refreshToken)){
+    let canVerify=false;
+    if(state.refreshToken){
+      const refreshed=await refreshTokenFn('wake');
+      canVerify=refreshed.status==='success'||(refreshed.status==='transient'&&!!state.accessToken&&Date.now()<state.tokenExpires);
+      if(refreshed.status==='transient'&&!canVerify){
+        showApp();
+        const offline=refreshed.reason==='offline';
+        setConnectionHealth(offline?'offline':'error',offline?'Offline':'Spotify unavailable','Listen Later remains available. Playback will recover without deleting your sign-in.',offline?'You are offline. Saved items remain available.':'Spotify is temporarily unavailable. Your sign-in was kept.');
+        return;
+      }
+      if(refreshed.status==='invalid_grant')return;
+    }else canVerify=!!state.accessToken&&Date.now()<state.tokenExpires;
+    if(canVerify){
+      if(await verifyUser()){showApp();return;}
+      if(state.accessToken||state.refreshToken){
+        showApp();
+        setConnectionHealth('error','Spotify unavailable','Listen Later remains available. Your sign-in was kept.','Spotify could not verify the account right now. CleanPlay will retry.');
+        return;
+      }
+    }
+  }
+  showSetup();
+}
+
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='hidden'){
+    stopPolling();
+    state.needsSdkRecovery=true;
+    noteDiagnostic('lifecycle','hidden',{reason:'wake',target:state.preferredTarget.kind,outcome:'degraded'});
+    setConnectionHealth('recovering','Paused','CleanPlay will refresh when you return.');
+  }else{
+    noteDiagnostic('lifecycle','visible',{reason:'visible',target:state.preferredTarget.kind,outcome:'retry'});
+    resumeSession('visible');
+  }
+});
+window.addEventListener('pagehide',function(){
+  stopPolling();
+  state.needsSdkRecovery=true;
+});
+window.addEventListener('pageshow',function(){
+  noteDiagnostic('lifecycle','pageshow',{reason:'pageshow',target:state.preferredTarget.kind,outcome:'retry'});
+  resumeSession('pageshow');
+});
+window.addEventListener('offline',function(){
+  stopPolling();
+  noteDiagnostic('network','offline',{reason:'wake',target:state.preferredTarget.kind,outcome:'degraded'});
+  setConnectionHealth('offline','Offline','Listen Later remains available on this device.','You are offline. CleanPlay will retry automatically.');
+});
+window.addEventListener('online',function(){
+  noteDiagnostic('network','online',{reason:'online',target:state.preferredTarget.kind,outcome:'retry'});
+  resumeSession('online');
+});
+
+function registerServiceWorker(){
+  if(!('serviceWorker' in navigator) || !window.isSecureContext)return;
+  navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'})
+    .catch(error=>console.warn('Service worker registration failed',error));
+}
+
+window.addEventListener('load',()=>{ decideNextScreen(); initSeekDrag(); renderSearchHistory(); registerServiceWorker(); });
 </script>
-<audio id="iosKeepAlive" loop preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" style="display:none"></audio>
 </body>
 </html>
