@@ -4,23 +4,23 @@ CleanPlay is a private, text-only Spotify controller designed for iPhone and des
 
 ## Highlights
 
-- Remote control for an existing Spotify Connect device
-- Optional in-browser playback through Spotify's Web Playback SDK (Premium required)
+- In-browser playback through Spotify's Web Playback SDK (Premium required); the Spotify phone app is not required
+- Optional remote control for another Spotify Connect device
 - Automatic playback targeting: use an active/sole Connect device, otherwise prepare this browser from the user's Play tap
 - Search, Now Playing, queue, lyrics, device selection, and a sleep timer
 - Local, text-only **Listen Later** for tracks, albums, artists, and playlists
 - Installable iPhone PWA with a standalone layout, safe-area support, and an offline app shell
 - Wake/reconnect handling for expired access tokens and short-lived Spotify SDK device IDs
-- One-tap iPhone playback recovery after screen lock, with bounded foreground reconnect attempts
+- Continuous queued playback through iPhone screen lock, with a local ordered queue recovery ledger
 - Local, redacted diagnostics that can be copied for troubleshooting
 
 CleanPlay does not download music and cannot play while offline. The service worker caches only the app shell.
 
 ## Best way to use it on iPhone
 
-For the most reliable lock/unlock experience, keep playback on the Spotify app, a speaker, a computer, or another Spotify Connect device and use CleanPlay as the remote. iOS can suspend a Home Screen web app and its embedded Spotify player while the phone is locked, so **Play here** is convenient but inherently less reliable after a long background period.
+Open the site in Safari, use **Share > Add to Home Screen**, then launch CleanPlay from its icon. Choose **Here** once and start playback with a real tap. CleanPlay keeps the same activated browser player through ordinary lock/unlock cycles and maintains an ordered local ledger of songs added through its queue. If Spotify genuinely retires the browser device, the next playback tap registers an activated replacement and restores the remaining sequence.
 
-Open the site in Safari, use **Share > Add to Home Screen**, then launch CleanPlay from its icon. If no Spotify Connect device is available, a Play tap prepares CleanPlay itself as the target instead of sending a targetless request. If iOS has suspended in-browser playback, reopen the app and tap a playback action; CleanPlay will refresh authorization, discard stale device IDs, and reconnect the embedded player.
+iOS can still suspend any Home Screen web app after a long background period, so browser playback cannot carry the same guarantee as a native player. CleanPlay now avoids rebuilding a healthy player merely because the screen locked; a real `not_ready` or device-missing response is required. Other Spotify Connect devices remain an optional target, not a requirement.
 
 ## Setup
 

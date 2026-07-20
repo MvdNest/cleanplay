@@ -568,7 +568,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.2 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.3 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -598,6 +598,10 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
   </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<!-- A real, silent media element keeps iOS from freezing the page between
+     Spotify SDK tracks while the screen is locked. It starts only after the
+     user's playback gesture and stops whenever local playback pauses. -->
+<audio id="iosKeepAlive" loop playsinline preload="auto" aria-hidden="true" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" style="display:none"></audio>
 <script>
 // Preload the SDK class before the first tap. The player itself is still
 // created only after authentication, but iOS then has a real player available
@@ -617,7 +621,7 @@ function hasRequiredSdkScopes(value){
   const granted=new Set(String(value||'').split(/\s+/).filter(Boolean));
   return REQUIRED_SDK_SCOPES.every(function(scope){return granted.has(scope);});
 }
-const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',authIssuedAt:'cp_auth_issued_at',authScopes:'cp_auth_scopes',codeVerifier:'cp_code_verifier',oauthState:'cp_oauth_state',recentQueued:'cp_recent_queued',lastPlayed:'cp_last_played',searchHistory:'cp_search_history'};
+const KEYS = {clientId:'cp_client_id',expectedUserId:'cp_expected_user_id',accessToken:'cp_access_token',refreshToken:'cp_refresh_token',tokenExpires:'cp_token_expires',authIssuedAt:'cp_auth_issued_at',authScopes:'cp_auth_scopes',codeVerifier:'cp_code_verifier',oauthState:'cp_oauth_state',recentQueued:'cp_recent_queued',queueLedger:'cp_queue_ledger_v1',lastPlayed:'cp_last_played',searchHistory:'cp_search_history'};
 let state = {accessToken:null,refreshToken:null,tokenExpires:0,clientId:null,user:null,isPlaying:false,shuffleState:false,repeatState:'off',localProgress:0,localDuration:0,searchFilter:'track',sleepTimerEnd:0,sleepTimerInterval:null,pollTimer:null,progressTimer:null,webPlayer:null,cleanplayDeviceId:null,sdkReady:false,activeDeviceId:null,sdkActivated:false,currentTrackId:null,currentTrackUri:null,currentContextUri:null,currentContextType:null,currentContextName:null,currentContextOwner:null,currentContextTracks:null,detail:null,prevView:'now-playing'};
 const contextNameCache = new Map();   // uri -> {name, owner, tracks?}
 const lyricsCache = new Map();        // trackId -> {found, plain, syncedLines, instrumental}
@@ -821,6 +825,11 @@ async function fetchState(guard){
     return true;
   }
   state.isPlaying=data.is_playing;state.shuffleState=data.shuffle_state;state.repeatState=data.repeat_state;
+  if(data.device&&data.device.id===state.cleanplayDeviceId){
+    state.sdkPlaybackActive=!!data.is_playing;
+    if(data.is_playing){releaseIosKeepAliveHold(false);startIosKeepAlive();setTimeout(startPolling,0);}
+    else stopIosKeepAlive();
+  }
   state.localDuration=data.item.duration_ms||0;
   // Spotify quirk: /me/player returns progress_ms=0 for tracks playing on Web Playback SDK devices.
   // When the active device is our SDK, prefer the SDK's getCurrentState().position which is accurate.
@@ -833,6 +842,11 @@ async function fetchState(guard){
     }catch{}
   }
   state.localProgress = progress;
+  // iOS can advance the queue pointer but leave the new track paused at zero.
+  // Resume that exact URI with the remaining ledger; /next would skip it.
+  if(prevWasPlaying&&prevUri&&data.item.uri!==prevUri&&!data.is_playing&&state.localProgress<1000){
+    forceNextIfStuck('paused-next-after-end '+prevUri,prevUri,data.item.uri);
+  }
   // CASE B: Spotify still shows the same track but is paused at the very end — force /next.
   if(!data.is_playing && state.localDuration > 0 && state.localProgress >= state.localDuration - 1000){
     forceNextIfStuck('stuck-at-end of '+data.item.uri, data.item.uri);
@@ -845,6 +859,7 @@ async function fetchState(guard){
   state.currentTrackId = data.item.id;
   state.currentTrackUri = data.item.uri;
   state.currentTrack = data.item;  // keep full track so the lyrics lookup has artist/album/duration
+  if(data.is_playing)consumeQueueLedger(data.item.uri);
   // Remember what's playing so the idle screen can offer "jump back in" after the session dies
   try{ localStorage.setItem(KEYS.lastPlayed, JSON.stringify({trackUri:data.item.uri,trackName:data.item.name,artists:(data.item.artists||[]).map(a=>a.name).join(', '),contextUri:data.context?.uri||null,ts:Date.now()})); }catch{}
   const contextUpdated=await updateContextLine(data.context,data.item,isCurrent);
@@ -1218,6 +1233,61 @@ async function playUris(uris){
 // in its response without telling us which is which. We remember every URI the user adds via
 // the + button (6h TTL) so the Queue view can label "queued" rows distinctly from autoplay.
 const QUEUED_TTL_MS = 6*60*60*1000;
+const QUEUE_LEDGER_TTL_MS = 12*60*60*1000;
+const QUEUE_LEDGER_LIMIT = 50;
+function cleanQueueUris(uris){
+  return (Array.isArray(uris)?uris:[]).map(function(uri){return String(uri||'');}).filter(function(uri){return /^spotify:(track|episode):[A-Za-z0-9]+$/.test(uri);}).slice(0,QUEUE_LEDGER_LIMIT);
+}
+function readQueueLedger(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(KEYS.queueLedger)||'null');
+    if(!saved||saved.version!==1||!Array.isArray(saved.uris)||Date.now()-Number(saved.updatedAt||0)>QUEUE_LEDGER_TTL_MS)return [];
+    return cleanQueueUris(saved.uris);
+  }catch{return [];}
+}
+function writeQueueLedger(uris){
+  const clean=cleanQueueUris(uris);
+  try{
+    if(clean.length)localStorage.setItem(KEYS.queueLedger,JSON.stringify({version:1,uris:clean,updatedAt:Date.now()}));
+    else localStorage.removeItem(KEYS.queueLedger);
+  }catch{}
+  return clean;
+}
+function appendQueueLedger(uri){
+  const clean=cleanQueueUris([uri]);
+  if(!clean.length)return readQueueLedger();
+  return writeQueueLedger(readQueueLedger().concat(clean));
+}
+function consumeQueueLedger(currentUri){
+  const uri=String(currentUri||''),ledger=readQueueLedger(),index=ledger.indexOf(uri);
+  if(index<0)return ledger;
+  return writeQueueLedger(ledger.slice(index+1));
+}
+function knownRemainingQueue(){
+  const ledger=readQueueLedger();
+  if(ledger.length)return ledger;
+  const current=state.currentTrackUri;
+  return cleanQueueUris((_queueSnapshot||[]).map(function(track){return track&&track.uri;}).filter(function(uri){return uri&&uri!==current;}));
+}
+function stageQueueRecovery(){
+  const remaining=knownRemainingQueue();
+  if(!remaining.length){state.queueRecoveryPlan=null;return null;}
+  state.queueRecoveryPlan={
+    uris:remaining,
+    currentUri:/^spotify:(track|episode):[A-Za-z0-9]+$/.test(String(state.currentTrackUri||''))?state.currentTrackUri:null,
+    positionMs:Math.max(0,Math.floor(Number(state.localProgress)||0)),
+    createdAt:Date.now()
+  };
+  return state.queueRecoveryPlan;
+}
+function activeQueueRecoveryPlan(){
+  const plan=state.queueRecoveryPlan;
+  if(!plan||Date.now()-Number(plan.createdAt||0)>30000){state.queueRecoveryPlan=null;return null;}
+  const uris=cleanQueueUris(plan.uris);
+  if(!uris.length){state.queueRecoveryPlan=null;return null;}
+  plan.uris=uris;
+  return plan;
+}
 function recordQueueAdd(uri){
   try{
     let list = JSON.parse(localStorage.getItem(KEYS.recentQueued) || '[]');
@@ -1226,6 +1296,7 @@ function recordQueueAdd(uri){
     list = list.filter(x => x && x.ts > cutoff).slice(-50);
     localStorage.setItem(KEYS.recentQueued, JSON.stringify(list));
   }catch{}
+  appendQueueLedger(uri);
 }
 function getRecentQueuedUris(){
   try{
@@ -1896,6 +1967,7 @@ Object.assign(state,{
   foregroundResumeTimer:null,
   needsSdkRecovery:false,
   sdkDeviceUnconfirmed:false,
+  sdkPlaybackActive:false,
   sdkGeneration:0,
   sdkAuthRecoveryPromise:null,
   authRefreshGeneration:0,
@@ -1905,7 +1977,14 @@ Object.assign(state,{
   activeDeviceName:null,
   activeDeviceType:null,
   sdkAuthFailures:0,
-  authScopes:''
+  authScopes:'',
+  pollIntervalMs:0,
+  sdkTransitionKeepAliveUntil:0,
+  sdkTransitionKeepAliveTimer:null,
+  autoAdvancePromise:null,
+  autoAdvancePendingUri:null,
+  queueRecoveryPlan:null,
+  queueRecoveryPromise:null
 });
 
 function noteDiagnostic(category,event,fields){
@@ -1952,11 +2031,59 @@ function isAppVisible(){
 function stopPolling(){
   clearInterval(state.pollTimer);
   state.pollTimer=null;
+  state.pollIntervalMs=0;
+}
+function localPlaybackNeedsWatchdog(){
+  return state.preferredTarget&&state.preferredTarget.kind==='here'&&state.sdkReady&&(state.isPlaying||state.sdkPlaybackActive);
 }
 function startPolling(){
+  if(!state.accessToken)return;
+  const localWatch=localPlaybackNeedsWatchdog();
+  if(!isAppVisible()&&!localWatch)return;
+  const intervalMs=localWatch?5000:15000;
+  if(state.pollTimer&&state.pollIntervalMs===intervalMs)return;
   stopPolling();
-  if(!isAppVisible()||!state.accessToken)return;
-  state.pollTimer=setInterval(function(){if(isAppVisible())fetchState();},15000);
+  state.pollIntervalMs=intervalMs;
+  state.pollTimer=setInterval(function(){
+    if(isAppVisible()||localPlaybackNeedsWatchdog())fetchState();
+  },intervalMs);
+}
+function startIosKeepAlive(){
+  const audio=document.getElementById('iosKeepAlive');
+  if(!audio)return false;
+  if(audio.paused){
+    try{
+      const play=audio.play();
+      if(play&&typeof play.catch==='function')play.catch(function(){});
+    }catch{}
+  }
+  return !audio.paused;
+}
+function stopIosKeepAlive(force){
+  if(!force&&Date.now()<Number(state.sdkTransitionKeepAliveUntil||0))return false;
+  const audio=document.getElementById('iosKeepAlive');
+  if(!audio)return false;
+  if(!audio.paused){
+    try{audio.pause();audio.currentTime=0;}catch{}
+  }
+  return audio.paused;
+}
+function releaseIosKeepAliveHold(stopIfInactive){
+  clearTimeout(state.sdkTransitionKeepAliveTimer);
+  state.sdkTransitionKeepAliveTimer=null;
+  state.sdkTransitionKeepAliveUntil=0;
+  if(stopIfInactive&&!state.sdkPlaybackActive)stopIosKeepAlive(true);
+}
+function holdIosKeepAlive(ms){
+  const duration=Math.max(1000,Number(ms)||8000);
+  startIosKeepAlive();
+  state.sdkTransitionKeepAliveUntil=Date.now()+duration;
+  clearTimeout(state.sdkTransitionKeepAliveTimer);
+  state.sdkTransitionKeepAliveTimer=setTimeout(function(){
+    state.sdkTransitionKeepAliveTimer=null;
+    state.sdkTransitionKeepAliveUntil=0;
+    if(!state.sdkPlaybackActive)stopIosKeepAlive(true);
+  },duration);
 }
 
 function loadSpotifySdk(options){
@@ -2018,6 +2145,7 @@ function invalidateSdkDevice(reason,reportedId){
   state.needsSdkRecovery=true;
   state.sdkDeviceUnconfirmed=false;
   state.cleanplayDeviceId=null;
+  state.queueRecoveryPromise=null;
   if(state.activeDeviceId&&(state.activeDeviceId===stale||state.activeDeviceId===reportedId)){
     state.activeDeviceId=null;state.activeDeviceName=null;state.activeDeviceType=null;
   }
@@ -2033,10 +2161,68 @@ function disconnectWebPlayer(){
   state.webPlayer=null;
   state.sdkReady=false;
   state.sdkActivated=false;
+  state.sdkPlaybackActive=false;
   state.sdkDeviceUnconfirmed=false;
   state.cleanplayDeviceId=null;
+  state.queueRecoveryPromise=null;
+  state.autoAdvancePromise=null;
+  state.autoAdvancePendingUri=null;
+  state._lastSdkPlayingUri=null;
+  _autoAdvanceLastUri=null;
   resolveSdkReady(false);
+  releaseIosKeepAliveHold(false);
+  stopIosKeepAlive(true);
   if(player){try{player.disconnect();}catch{}}
+}
+function queueAwarePlaybackBody(body,label){
+  const source=body&&typeof body==='object'?body:null;
+  if(!source)return source;
+  const copy={...source};
+  if(Array.isArray(source.uris))copy.uris=cleanQueueUris(source.uris);
+  const plan=activeQueueRecoveryPlan();
+  // A killed PWA can reopen with no in-memory recovery plan while the durable
+  // ledger still contains the songs that followed lastPlayed. Resume that
+  // sequence as one request; a deliberate new selection does not inherit it.
+  const remaining=plan?plan.uris:(label==='resume_last'?readQueueLedger():[]);
+  if(!remaining.length||!['play_track','resume_last'].includes(label))return copy;
+  if(copy.uris&&copy.uris.length===1)copy.uris=copy.uris.concat(remaining);
+  else if(label==='resume_last'&&copy.context_uri&&copy.offset&&cleanQueueUris([copy.offset.uri]).length){
+    // Resume metadata normally prefers context+offset, but an explicit URI
+    // sequence is the only atomic way to guarantee the locally queued songs
+    // still follow it after the old browser player was destroyed.
+    return {uris:[copy.offset.uri].concat(remaining)};
+  }
+  return copy;
+}
+async function appendRecoveryQueue(plan){
+  if(!plan||!plan.uris.length)return true;
+  for(const uri of plan.uris){
+    const ok=await playerCommand('queue_restore_add',function(){return {path:withPlaybackTarget('/me/player/queue?uri='+encodeURIComponent(uri)),method:'POST'};});
+    if(!ok)return false;
+  }
+  writeQueueLedger(plan.uris);
+  state.queueRecoveryPlan=null;
+  return true;
+}
+function restoreQueueAfterReady(generation){
+  if(state.queueRecoveryPromise)return state.queueRecoveryPromise;
+  const plan=activeQueueRecoveryPlan();
+  if(!plan||!state.sdkActivated||!state.sdkReady||generation!==state.sdkGeneration)return Promise.resolve(false);
+  const sequence=cleanQueueUris((plan.currentUri?[plan.currentUri]:[]).concat(plan.uris));
+  if(!sequence.length)return Promise.resolve(false);
+  const body={uris:sequence};
+  if(plan.currentUri&&plan.positionMs>0)body.position_ms=plan.positionMs;
+  let work;
+  work=playerCommand('queue_restore',function(){return {path:withPlaybackTarget('/me/player/play'),method:'PUT',body:body};}).then(function(ok){
+    if(ok&&generation===state.sdkGeneration){
+      writeQueueLedger(sequence);
+      state.queueRecoveryPlan=null;
+      noteDiagnostic('playback','command_ok',{reason:'wake',target:'here',outcome:'ok'});
+    }
+    return ok;
+  }).finally(function(){if(state.queueRecoveryPromise===work)state.queueRecoveryPromise=null;});
+  state.queueRecoveryPromise=work;
+  return work;
 }
 function createWebPlayer(){
   if(state.webPlayer||!state.accessToken||!window.Spotify||!window.Spotify.Player)return state.webPlayer;
@@ -2079,7 +2265,7 @@ function createWebPlayer(){
       const age=Date.now()-pending.createdAt;
       if(state.sdkActivated&&age<20000){
         state.pendingPlaybackIntent=null;
-        Promise.resolve().then(pending.run);
+        Promise.resolve().then(pending.run).then(function(){return restoreQueueAfterReady(generation);});
       }else if(age>=20000){
         state.pendingPlaybackIntent=null;
         setConnectionHealth('recovering','Tap play','The earlier playback request expired while this device was reconnecting.','Tap play to start audio on this device.');
@@ -2088,7 +2274,7 @@ function createWebPlayer(){
         // player and complete the same intent instead of losing it.
         setConnectionHealth('recovering','Tap play','This device is reconnected and waiting for audio permission.','Tap play to start audio on this device.');
       }
-    }
+    }else if(state.sdkActivated)restoreQueueAfterReady(generation);
   });
   player.addListener('not_ready',function(payload){
     if(!isCurrentPlayer())return;
@@ -2139,8 +2325,24 @@ function createWebPlayer(){
     const current=sdkState.track_window&&sdkState.track_window.current_track&&sdkState.track_window.current_track.uri;
     const previous=sdkState.track_window&&sdkState.track_window.previous_tracks&&sdkState.track_window.previous_tracks[0]&&sdkState.track_window.previous_tracks[0].uri;
     const ended=sdkState.paused&&sdkState.position===0&&previous&&previous===state._lastSdkPlayingUri;
-    if(ended)forceNextIfStuck('sdk_end',previous);
-    if(current&&!sdkState.paused)state._lastSdkPlayingUri=current;
+    state.sdkPlaybackActive=!sdkState.paused;
+    if(ended){
+      // Keep the page alive until the bounded end fallback settles; stopping the
+      // silent stream first lets iOS freeze the /next request at the boundary.
+      holdIosKeepAlive(8000);
+      Promise.resolve(forceNextIfStuck('sdk_end',previous,current)).then(function(recovered){
+        if(!isCurrentPlayer())return;
+        // `undefined` can be a duplicate SDK end event already covered by the
+        // same transition. Only a definite failure releases the hold early.
+        if(recovered===false)releaseIosKeepAliveHold(true);
+      },function(){if(isCurrentPlayer())releaseIosKeepAliveHold(true);});
+    }else if(!sdkState.paused){
+      releaseIosKeepAliveHold(false);
+      state._lastSdkPlayingUri=current||state._lastSdkPlayingUri;
+      if(current)consumeQueueLedger(current);
+      startIosKeepAlive();
+      startPolling();
+    }else stopIosKeepAlive();
   });
   noteDiagnostic('sdk','sdk_connect',{reason:state.lifecycleReason||'manual',target:'here',outcome:'retry'});
   state.sdkConnectPromise=Promise.resolve(player.connect()).then(function(success){
@@ -2168,6 +2370,7 @@ function rebuildWebPlayer(reason){
   state.lifecycleReason=reason||'wake';
   noteDiagnostic('sdk','sdk_rebuild',{reason:reason||'wake',target:'here',outcome:'retry'});
   state.sdkRebuildPromise=loadSpotifySdk().then(function(){
+    if(!activeQueueRecoveryPlan())stageQueueRecovery();
     disconnectWebPlayer();
     const player=createWebPlayer();
     return player&&state.sdkReadyPromise?state.sdkReadyPromise:false;
@@ -2176,6 +2379,7 @@ function rebuildWebPlayer(reason){
 }
 function rebuildWebPlayerForGesture(){
   if(!window.Spotify||!window.Spotify.Player)return null;
+  if(!activeQueueRecoveryPlan())stageQueueRecovery();
   disconnectWebPlayer();
   const player=createWebPlayer();
   activateSdkAudio();
@@ -2189,18 +2393,24 @@ function activateSdkAudio(){
   try{
     const activation=player.activateElement();
     state.sdkActivated=true;
+    startIosKeepAlive();
     if(activation&&typeof activation.catch==='function'){
       activation.catch(function(){
         if(!isCurrent())return;
         state.sdkActivated=false;
+        if(!state.sdkPlaybackActive)stopIosKeepAlive();
         noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
         setConnectionHealth('recovering','Tap play again','The browser did not enable audio on the first attempt.','Tap play once more to enable audio on this device.');
       });
     }
-    if(isCurrent())noteDiagnostic('lifecycle','visible',{reason:'gesture',target:'here',outcome:'ok'});
+    if(isCurrent()){
+      noteDiagnostic('lifecycle','visible',{reason:'gesture',target:'here',outcome:'ok'});
+      if(state.sdkReady)restoreQueueAfterReady(generation);
+    }
     return true;
   }catch{
     state.sdkActivated=false;
+    if(!state.sdkPlaybackActive)stopIosKeepAlive();
     return false;
   }
 }
@@ -2217,9 +2427,10 @@ async function reconcileDevices(guard){
     if(state.preferredTarget.kind==='here'){
       const localListed=!!localId&&devices.some(function(device){return device.id===localId;});
       if(state.sdkReady&&localId&&localListed){
-        // Device discovery can briefly list a player that iOS silently killed.
-        // Do not let that listing clear the suspend marker; a current `ready`
-        // event or a successful visible command is stronger evidence.
+        // Preserve the existing SDK session and its queue when Spotify still
+        // lists this exact player. A genuine 404/not_ready remains authoritative
+        // and will use the bounded replacement path.
+        state.sdkDeviceUnconfirmed=false;
         state.activeDeviceId=localId;
       state.activeDeviceName='CleanPlay - this device';
       state.activeDeviceType='Computer';
@@ -2463,6 +2674,16 @@ async function playerCommand(command,requestFactory){
     const missingDevice=failure.status===404&&failure.reason==='device_missing';
     if(attempt===0&&missingDevice){
       noteDiagnostic('playback','command_retry',{status:404,attempt:1,reason:'device_missing',target:playbackTargetKind(),outcome:'retry'});
+      if(state.preferredTarget.kind==='here'||commandDeviceId&&(commandDeviceId===state.cleanplayDeviceId||commandDeviceId===state.staleCleanplayDeviceId)){
+        // The 404 arrives after the originating tap has yielded. Replacing the
+        // SDK player here would create an audio element that iOS never received
+        // permission to activate. Preserve the ordered queue and let the next
+        // real playback tap rebuild + activate synchronously instead.
+        if(!activeQueueRecoveryPlan())stageQueueRecovery();
+        invalidateSdkDevice('device_missing',commandDeviceId);
+        setConnectionHealth('recovering','Tap play once','The browser player changed, but your remaining queue was kept.','Tap play once to reconnect this device and continue your queue.');
+        return false;
+      }
       if(await recoverPlaybackTarget('device_missing'))continue;
     }
     noteDiagnostic('playback','command_failed',{status:failure.status||0,attempt:attempt,target:playbackTargetKind(),outcome:'failed'});
@@ -2522,8 +2743,22 @@ function preparePlaybackIntent(label,run){
 }
 async function playBody(label,body){
   const run=async function(){
-    const ok=await playerCommand(label,function(){return {path:withPlaybackTarget('/me/player/play'),method:'PUT',body:body};});
-    if(ok){switchView('now-playing');setTimeout(fetchState,650);}
+    const recovery=activeQueueRecoveryPlan();
+    const requestBody=queueAwarePlaybackBody(body,label);
+    const ok=await playerCommand(label,function(){return {path:withPlaybackTarget('/me/player/play'),method:'PUT',body:requestBody};});
+    if(ok){
+      // A successful Start Playback replaces the prior queue context. Invalidate
+      // the rendered snapshot too, otherwise it can outlive an intentionally
+      // cleared ledger until the next queue refresh.
+      _queueSnapshot=[];state._queueRefreshAt=0;
+      if(requestBody&&Array.isArray(requestBody.uris)&&(requestBody.uris.length>1||label==='play_queue'||label==='play_list')){
+        writeQueueLedger(requestBody.uris);
+        state.queueRecoveryPlan=null;
+      }else if(recovery&&requestBody&&requestBody.context_uri){
+        await appendRecoveryQueue(recovery);
+      }else writeQueueLedger([]);
+      switchView('now-playing');setTimeout(fetchState,650);
+    }
     return ok;
   };
   if(preparePlaybackIntent(label,run))return false;
@@ -2546,7 +2781,13 @@ async function togglePlay(forcePlaying){
   }
   const run=async function(){
     const ok=await playerCommand(nextPlaying?'play':'pause',function(){return {path:withPlaybackTarget(nextPlaying?'/me/player/play':'/me/player/pause'),method:'PUT'};});
-    if(ok){state.isPlaying=nextPlaying;updateControls();if('mediaSession'in navigator)navigator.mediaSession.playbackState=nextPlaying?'playing':'paused';}
+    if(ok){
+      state.isPlaying=nextPlaying;
+      state.sdkPlaybackActive=nextPlaying&&state.activeDeviceId===state.cleanplayDeviceId;
+      if(nextPlaying&&state.sdkPlaybackActive){startIosKeepAlive();startPolling();}
+      else if(!nextPlaying){releaseIosKeepAliveHold(false);stopIosKeepAlive(true);}
+      updateControls();if('mediaSession'in navigator)navigator.mediaSession.playbackState=nextPlaying?'playing':'paused';
+    }
     return ok;
   };
   if(preparePlaybackIntent(nextPlaying?'play':'pause',run))return false;
@@ -2624,11 +2865,43 @@ async function addToQueue(trackUri,event){
   if(ok){recordQueueAdd(trackUri);state._queueRefreshAt=0;setTimeout(refreshUpNext,400);toast('Added to queue','success');}
   return ok;
 }
-async function forceNextIfStuck(reason,uri){
-  if(uri&&uri===_autoAdvanceLastUri)return;
-  _autoAdvanceLastUri=uri||_autoAdvanceLastUri;
-  const ok=await playerCommand('auto_next',function(){return {path:withPlaybackTarget('/me/player/next'),method:'POST'};});
-  if(ok)setTimeout(async function(){await playerCommand('auto_play',function(){return {path:withPlaybackTarget('/me/player/play'),method:'PUT'};});fetchState();},350);
+function forceNextIfStuck(reason,uri,nextUri){
+  if(uri&&uri===_autoAdvanceLastUri)return Promise.resolve(true);
+  const pendingUri=String(uri||'');
+  if(state.autoAdvancePromise&&state.autoAdvancePendingUri===pendingUri)return state.autoAdvancePromise;
+  let work;
+  work=(async function(){
+    let remaining=knownRemainingQueue().filter(function(item){return item!==uri;});
+    const expected=String(nextUri||'');
+    if(/^spotify:(track|episode):[A-Za-z0-9]+$/.test(expected)){
+      const expectedIndex=remaining.indexOf(expected);
+      remaining=expectedIndex>=0?remaining.slice(expectedIndex):[expected].concat(remaining);
+    }
+    if(remaining.length){
+      const resumed=await playerCommand('auto_queue',function(){return {path:withPlaybackTarget('/me/player/play'),method:'PUT',body:{uris:remaining}};});
+      if(resumed){
+        _autoAdvanceLastUri=uri||_autoAdvanceLastUri;
+        writeQueueLedger(remaining);
+        setTimeout(fetchState,350);
+        return true;
+      }
+      _autoAdvanceLastUri=null;
+      return false;
+    }
+    const ok=await playerCommand('auto_next',function(){return {path:withPlaybackTarget('/me/player/next'),method:'POST'};});
+    if(!ok){_autoAdvanceLastUri=null;return false;}
+    await new Promise(function(resolve){setTimeout(resolve,350);});
+    const resumed=await playerCommand('auto_play',function(){return {path:withPlaybackTarget('/me/player/play'),method:'PUT'};});
+    if(!resumed){_autoAdvanceLastUri=null;return false;}
+    _autoAdvanceLastUri=uri||_autoAdvanceLastUri;
+    fetchState();
+    return true;
+  })().finally(function(){
+    if(state.autoAdvancePromise===work){state.autoAdvancePromise=null;state.autoAdvancePendingUri=null;}
+  });
+  state.autoAdvancePendingUri=pendingUri;
+  state.autoAdvancePromise=work;
+  return work;
 }
 async function detailPlayAll(){
   if(!state.detail)return false;
@@ -3092,6 +3365,8 @@ function endAuthorizedSession(){
   state.sdkAuthRecoveryPromise=null;
   if(typeof cancelResumeAttempt==='function')cancelResumeAttempt();
   try{localStorage.removeItem(KEYS.sleepTimerEnd);}catch{}
+  try{localStorage.removeItem(KEYS.queueLedger);}catch{}
+  state.queueRecoveryPlan=null;state.queueRecoveryPromise=null;
   if(typeof disconnectWebPlayer==='function')disconnectWebPlayer();
   else if(state.webPlayer){try{state.webPlayer.disconnect();}catch{}state.webPlayer=null;}
   state.cleanplayDeviceId=null;state.sdkReady=false;state.sdkActivated=false;state.activeDeviceId=null;state.activeDeviceName=null;state.activeDeviceType=null;state.user=null;
@@ -3375,18 +3650,21 @@ async function decideNextScreen(){
   showSetup();
 }
 
-function markSdkDeviceUnconfirmedOnSuspend(){
-  // A ready event can be delivered while iOS is locking or restoring the PWA.
-  // Keep the current player alive for uninterrupted audio, but require the next
-  // foreground playback gesture to register a fresh Spotify device first.
-  if(state.sdkReady&&state.cleanplayDeviceId)state.sdkDeviceUnconfirmed=true;
+function preserveLocalPlaybackOnSuspend(){
+  // The queue belongs to this SDK session. Keep its tiny end watchdog alive
+  // while local audio is playing; merely locking the screen is not evidence
+  // that Spotify discarded the device.
+  if(localPlaybackNeedsWatchdog()){
+    startIosKeepAlive();
+    startPolling();
+    return true;
+  }
+  stopPolling();
+  return false;
 }
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='hidden'){
-    stopPolling();
-    // Do not interrupt audio merely because the screen locked. Keep the player
-    // alive, then use the next playback tap to re-register it if necessary.
-    markSdkDeviceUnconfirmedOnSuspend();
+    preserveLocalPlaybackOnSuspend();
     cancelResumeAttempt();
     noteDiagnostic('lifecycle','hidden',{reason:'wake',target:state.preferredTarget.kind,outcome:'degraded'});
     setConnectionHealth('recovering','Paused','CleanPlay will refresh when you return.');
@@ -3396,8 +3674,7 @@ document.addEventListener('visibilitychange',function(){
   }
 });
 window.addEventListener('pagehide',function(){
-  stopPolling();
-  markSdkDeviceUnconfirmedOnSuspend();
+  preserveLocalPlaybackOnSuspend();
   cancelResumeAttempt();
 });
 window.addEventListener('pageshow',function(){
