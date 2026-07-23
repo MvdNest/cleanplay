@@ -249,3 +249,4 @@ If iOS still retires active browser audio in real-world testing, a native iOS cl
 3. **v3** - iPhone PWA shell, remote-first reliability, resilient wake/auth/device recovery, local Listen Later, redacted diagnostics, and 2026 Spotify API migration.
 4. **v3.3** - preserved iPhone SDK sessions through screen lock, restored continuous queued playback, and added an ordered local queue recovery ledger.
 5. **v3.4** - restored single-media-session iPhone playback, serialized deliberate starts, and added a same-device retry for transient fresh-player `404`s.
+6. **v3.4.1** - stopped treating iPhone's transient paused-at-zero SDK states as ended tracks, serialized recovery, and reactivated the existing audio element on every deliberate playback tap after wake.

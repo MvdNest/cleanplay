@@ -568,7 +568,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.4 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.4.1 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -837,13 +837,13 @@ async function fetchState(guard){
     }catch{}
   }
   state.localProgress = progress;
-  // iOS can advance the queue pointer but leave the new track paused at zero.
-  // Resume that exact URI with the remaining ledger; /next would skip it.
-  if(prevWasPlaying&&prevUri&&data.item.uri!==prevUri&&!data.is_playing&&state.localProgress<1000){
-    forceNextIfStuck('paused-next-after-end '+prevUri,prevUri,data.item.uri);
-  }
+  // A paused new URI at zero is a normal iOS transition, not an end signal.
+  // Let Spotify's native queue own track changes. Only intervene when the same
+  // URI was already observed playing at its real end.
   // CASE B: Spotify still shows the same track but is paused at the very end — force /next.
-  if(!data.is_playing && state.localDuration > 0 && state.localProgress >= state.localDuration - 1000){
+  if(prevWasPlaying && prevUri===data.item.uri && prevDur > 0 &&
+      prevProg >= prevDur - 2500 && !data.is_playing &&
+      state.localDuration > 0 && state.localProgress >= state.localDuration - 1000){
     forceNextIfStuck('stuck-at-end of '+data.item.uri, data.item.uri);
   }
   // Reset the debounce when a track is actively playing well before its end (normal state).
@@ -2288,12 +2288,9 @@ function createWebPlayer(){
       return;
     }
     const current=sdkState.track_window&&sdkState.track_window.current_track&&sdkState.track_window.current_track.uri;
-    const previous=sdkState.track_window&&sdkState.track_window.previous_tracks&&sdkState.track_window.previous_tracks[0]&&sdkState.track_window.previous_tracks[0].uri;
-    const ended=sdkState.paused&&sdkState.position===0&&previous&&previous===state._lastSdkPlayingUri;
     state.sdkPlaybackActive=!sdkState.paused;
-    if(ended){
-      forceNextIfStuck('sdk_end',previous,current);
-    }else if(!sdkState.paused){
+    // iOS paused/zero loading states are not reliable end-of-track signals.
+    if(!sdkState.paused){
       state._lastSdkPlayingUri=current||state._lastSdkPlayingUri;
       if(current)consumeQueueLedger(current);
       startPolling();
@@ -2343,7 +2340,6 @@ function rebuildWebPlayerForGesture(){
 function activateSdkAudio(){
   const player=state.webPlayer;
   if(!player||typeof player.activateElement!=='function')return false;
-  if(state.sdkActivated)return true;
   const generation=state.sdkGeneration;
   const isCurrent=function(){return state.webPlayer===player&&state.sdkGeneration===generation;};
   try{
@@ -2831,7 +2827,8 @@ async function addToQueue(trackUri,event){
 function forceNextIfStuck(reason,uri,nextUri){
   if(uri&&uri===_autoAdvanceLastUri)return Promise.resolve(true);
   const pendingUri=String(uri||'');
-  if(state.autoAdvancePromise&&state.autoAdvancePendingUri===pendingUri)return state.autoAdvancePromise;
+  // A second recovery command can skip what the first command just started.
+  if(state.autoAdvancePromise)return state.autoAdvancePromise;
   let work;
   work=(async function(){
     let remaining=knownRemainingQueue().filter(function(item){return item!==uri;});
