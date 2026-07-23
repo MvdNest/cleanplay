@@ -11,16 +11,16 @@ CleanPlay is a private, text-only Spotify controller designed for iPhone and des
 - Local, text-only **Listen Later** for tracks, albums, artists, and playlists
 - Installable iPhone PWA with a standalone layout, safe-area support, and an offline app shell
 - Wake/reconnect handling for expired access tokens and short-lived Spotify SDK device IDs
-- Continuous queued playback through iPhone screen lock, with a local ordered queue recovery ledger
+- Continuous queued playback through iPhone screen lock using Spotify's single SDK media session and a local ordered recovery ledger
 - Local, redacted diagnostics that can be copied for troubleshooting
 
 CleanPlay does not download music and cannot play while offline. The service worker caches only the app shell.
 
 ## Best way to use it on iPhone
 
-Open the site in Safari, use **Share > Add to Home Screen**, then launch CleanPlay from its icon. Choose **Here** once and start playback with a real tap. CleanPlay keeps the same activated browser player through ordinary lock/unlock cycles and maintains an ordered local ledger of songs added through its queue. If Spotify genuinely retires the browser device, the next playback tap registers an activated replacement and restores the remaining sequence.
+Open the site in Safari, use **Share > Add to Home Screen**, then launch CleanPlay from its icon. Choose **Here** once and start playback with a real tap. CleanPlay keeps one activated Spotify browser player through ordinary lock/unlock cycles and maintains an ordered local ledger of songs added through its queue. A new selection sends one playback sequence and replaces stale recovery state; an explicit Resume may restore the interrupted sequence.
 
-iOS can still suspend any Home Screen web app after a long background period, so browser playback cannot carry the same guarantee as a native player. CleanPlay now avoids rebuilding a healthy player merely because the screen locked; a real `not_ready` or device-missing response is required. Other Spotify Connect devices remain an optional target, not a requirement.
+iOS can still suspend any Home Screen web app after a long background period, so browser playback cannot carry the same guarantee as a native player. CleanPlay avoids rebuilding a healthy player merely because the screen locked and retries a fresh SDK device's first transient `404` once before replacing it. Other Spotify Connect devices remain optional, not a requirement.
 
 ## Setup
 

@@ -2,7 +2,7 @@
 
 > Personal, text-only Spotify control. The app never renders album art or artist imagery.
 
-This document describes the v3.3 architecture and the constraints future changes must preserve.
+This document describes the v3.4 architecture and the constraints future changes must preserve.
 
 ## Deployment
 
@@ -96,17 +96,18 @@ Official references:
 
 The original iPhone failure was a PWA waking with an access token or SDK device ID that had stopped being valid during lock. Player calls then returned `401`, `404`, `NO_ACTIVE_DEVICE`, or "device not found."
 
-v3.3 recovery follows these rules:
+v3.4 recovery follows these rules:
 
 1. Serialize foreground/network recovery so several lifecycle signals cannot race. A foreground or manual retry supersedes work that was suspended while hidden, and every network/recovery attempt is bounded.
 2. Refresh authorization first when necessary; do not sign out for a transient failure.
-3. Preserve the active SDK instance while the app is hidden. Ordinary screen lock must not mark it stale or rebuild it. While local audio is active, keep the silent continuity element and five-second end watchdog running as long as iOS permits. A null `player_state_changed` payload can simply mean a ready device has no playback context and must not trigger a rebuild loop.
-4. Maintain `cp_queue_ledger_v1`, an ordered local ledger of CleanPlay-queued URIs. Use one `/play` URI sequence to recover a stalled queued transition or to restore the current item and remaining sequence after an unavoidable SDK replacement.
-5. Rebuild only after an authoritative `not_ready`, authentication failure, or confirmed device-missing `404`. Because a 404 arrives after the original gesture has yielded, preserve the recovery plan and wait for the next real playback tap to construct and activate the replacement synchronously.
-6. Treat the next SDK `ready` ID as authoritative. Never persist an SDK device ID in local storage.
-7. Refresh Spotify device and playback state before routing new controls. Ignore restricted devices; prefer the active device, an in-memory selection, or the sole unrestricted candidate.
-8. Remote targets may retry a confirmed missing-device request once after reconciliation. Local targets must not fall through to an unactivated or targetless retry.
-9. Restart ordinary polling after recovery settles.
+3. Preserve the active SDK instance while the app is hidden. Ordinary screen lock must not mark it stale or rebuild it. Spotify's SDK element is the only audio element; a separate silent stream can contend for iOS's single media session. A null `player_state_changed` payload can simply mean a ready device has no playback context and must not trigger a rebuild loop.
+4. Maintain `cp_queue_ledger_v1`, an ordered local ledger of CleanPlay-queued URIs. Use one `/play` URI sequence to restore an explicitly resumed interrupted session or the current item and remaining sequence after an unavoidable SDK replacement.
+5. A deliberate new selection owns exactly one `/play` command and never inherits a stale recovery plan. Spotify does not guarantee ordering between concurrent Player API commands.
+6. Treat the next SDK `ready` ID as authoritative. A fresh ID may briefly return device-missing `404` while Spotify's Player API catches up, so retry the exact targeted command once after 500 ms. Only a repeated `404` or authoritative `not_ready` invalidates the device.
+7. A replacement player that iOS must activate is created synchronously from the next real playback gesture. Never persist an SDK device ID in local storage.
+8. Refresh Spotify device and playback state before routing new controls. Ignore restricted devices; prefer the active device, an in-memory selection, or the sole unrestricted candidate.
+9. Remote targets may retry a confirmed missing-device request once after reconciliation. Local targets must not fall through to an unactivated or targetless retry.
+10. Restart ordinary polling after recovery settles.
 
 Keep recovery idempotent and visible in diagnostics. iOS still requires `player.activateElement()` during a real tap before in-browser audio starts; automated wake logic cannot manufacture that gesture.
 
@@ -212,7 +213,7 @@ Keep 44px-class tap targets, safe-area insets, visible keyboard focus, and reduc
 | Symptom | Meaning | Recovery |
 |---|---|---|
 | `401` after wake | Access token expired/revoked while suspended | Let recovery refresh; reauthorize only on `invalid_grant` |
-| `404`, `NO_ACTIVE_DEVICE`, or device not found | Old SDK device vanished or no Connect device is active | For **Here**, tap playback once to activate the replacement and restore the queued sequence; otherwise choose a live remote device |
+| `404`, `NO_ACTIVE_DEVICE`, or device not found | A fresh SDK ID is still propagating, or the old device vanished | CleanPlay retries the same local ID once; if it still fails, tap playback again to activate a replacement. For remote playback, choose a live device |
 | Sign-in required after about six months | Fixed refresh-token lifetime reached | Complete PKCE authorization again |
 | Play here is silent on iPhone | User gesture missing or SDK was genuinely retired | Tap a playback action once to activate the browser player |
 | Shell opens but controls fail offline | Only static shell is cached | Reconnect |
@@ -239,7 +240,7 @@ Do not commit personal contact details, Client Secrets, tokens, or copied diagno
 - Listen Later is local-only and can be lost with site data.
 - Spotify/iOS may show artwork in system-owned media UI.
 
-If iOS still retires active browser audio in real-world testing, a native iOS client is the only route to native-grade background guarantees. A minimal backend could add cross-device Listen Later, HttpOnly refresh-token custody, or centralized opt-in diagnostics, but it cannot stop iOS suspending browser audio. Keep the PWA path while its continuity element and queue ledger provide acceptable results; do not add rapid rebuild loops.
+If iOS still retires active browser audio in real-world testing, a native iOS client is the only route to native-grade background guarantees. A minimal backend could add cross-device Listen Later, HttpOnly refresh-token custody, or centralized opt-in diagnostics, but it cannot stop iOS suspending browser audio. Keep the PWA path while its single Spotify SDK media session and queue ledger provide acceptable results; do not add competing audio elements or rapid rebuild loops.
 
 ## History
 
@@ -247,3 +248,4 @@ If iOS still retires active browser audio in real-world testing, a native iOS cl
 2. **v2** - PKCE, Web Playback SDK, responsive redesign, lyrics, queue, sleep timer, and quality-of-life controls.
 3. **v3** - iPhone PWA shell, remote-first reliability, resilient wake/auth/device recovery, local Listen Later, redacted diagnostics, and 2026 Spotify API migration.
 4. **v3.3** - preserved iPhone SDK sessions through screen lock, restored continuous queued playback, and added an ordered local queue recovery ledger.
+5. **v3.4** - restored single-media-session iPhone playback, serialized deliberate starts, and added a same-device retry for transient fresh-player `404`s.
