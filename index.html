@@ -568,7 +568,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.4.1 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.5 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -1957,6 +1957,7 @@ KEYS.sleepTimerEnd = 'cp_sleep_timer_end';
 Object.assign(state,{
   preferredTarget:null,
   pendingPlaybackIntent:null,
+  playbackIntentSequence:0,
   sdkScriptPromise:null,
   sdkConnectPromise:null,
   sdkReadyPromise:null,
@@ -1971,6 +1972,11 @@ Object.assign(state,{
   sdkDeviceUnconfirmed:false,
   sdkPlaybackActive:false,
   sdkGeneration:0,
+  sdkActivationPromise:null,
+  sdkActivationGeneration:0,
+  sdkTransferPromise:null,
+  sdkTransferGeneration:0,
+  sdkPlaybackErrorCount:0,
   sdkAuthRecoveryPromise:null,
   authRefreshGeneration:0,
   refreshStartedAt:0,
@@ -2110,6 +2116,10 @@ function invalidateSdkDevice(reason,reportedId){
   state.sdkReady=false;
   state.sdkActivated=false;
   state.needsSdkRecovery=true;
+  state.sdkActivationPromise=null;
+  state.sdkActivationGeneration=0;
+  state.sdkTransferPromise=null;
+  state.sdkTransferGeneration=0;
   state.sdkDeviceUnconfirmed=false;
   state.cleanplayDeviceId=null;
   state.queueRecoveryPromise=null;
@@ -2131,6 +2141,10 @@ function disconnectWebPlayer(){
   state.sdkPlaybackActive=false;
   state.sdkDeviceUnconfirmed=false;
   state.cleanplayDeviceId=null;
+  state.sdkActivationPromise=null;
+  state.sdkActivationGeneration=0;
+  state.sdkTransferPromise=null;
+  state.sdkTransferGeneration=0;
   state.queueRecoveryPromise=null;
   state.autoAdvancePromise=null;
   state.autoAdvancePendingUri=null;
@@ -2215,7 +2229,9 @@ function createWebPlayer(){
     state.sdkReady=true;
     state.sdkAuthFailures=0;
     state.needsSdkRecovery=false;
-    state.sdkDeviceUnconfirmed=!isAppVisible();
+    state.sdkDeviceUnconfirmed=true;
+    state.sdkTransferGeneration=0;
+    state.sdkPlaybackErrorCount=0;
     if(state.preferredTarget.kind==='here'||state.activeDeviceId&&(state.activeDeviceId===oldId||state.activeDeviceId===staleId)){
       state.activeDeviceId=payload.device_id;
       state.activeDeviceName='CleanPlay - this device';
@@ -2225,21 +2241,9 @@ function createWebPlayer(){
     resolveSdkReady(true);
     noteDiagnostic('sdk','sdk_ready',{reason:state.lifecycleReason||'manual',target:'here',outcome:'ok'});
     setConnectionHealth('online','Ready','Spotify account connected. In-browser player is ready.');
-    const pending=state.pendingPlaybackIntent;
-    if(pending&&typeof pending.run==='function'){
-      const age=Date.now()-pending.createdAt;
-      if(state.sdkActivated&&age<20000){
-        state.pendingPlaybackIntent=null;
-        Promise.resolve().then(pending.run);
-      }else if(age>=20000){
-        state.pendingPlaybackIntent=null;
-        setConnectionHealth('recovering','Tap play','The earlier playback request expired while this device was reconnecting.','Tap play to start audio on this device.');
-      }else{
-        // Keep the request. A fresh iOS gesture can activate this now-ready
-        // player and complete the same intent instead of losing it.
-        setConnectionHealth('recovering','Tap play','This device is reconnected and waiting for audio permission.','Tap play to start audio on this device.');
-      }
-    }else if(state.sdkActivated)restoreQueueAfterReady(generation);
+    runPendingPlaybackIntent(generation).then(function(ran){
+      if(!ran&&!state.pendingPlaybackIntent&&state.sdkActivated)restoreQueueAfterReady(generation);
+    });
   });
   player.addListener('not_ready',function(payload){
     if(!isCurrentPlayer())return;
@@ -2254,7 +2258,10 @@ function createWebPlayer(){
     recovery=Promise.resolve(refreshTokenFn('auth')).then(function(result){
       if(!isCurrentPlayer())return;
       if(result.status==='invalid_grant')return;
-      if(result.status==='success'&&isAppVisible())return rebuildWebPlayer('auth');
+      if(result.status==='success'&&isAppVisible()){
+        setConnectionHealth('recovering','Tap play','Spotify refreshed the session. A fresh tap will reconnect audio safely.','Tap play to reconnect this device.');
+        return;
+      }
       if(result.status==='transient')setConnectionHealth('recovering','Spotify reconnecting','Your sign-in was kept. Retry when the connection is stable.','Spotify is temporarily unreachable. Tap Retry to reconnect.');
     }).finally(function(){if(state.sdkAuthRecoveryPromise===recovery)state.sdkAuthRecoveryPromise=null;});
     // A newer player generation is allowed to supersede an older recovery.
@@ -2272,12 +2279,31 @@ function createWebPlayer(){
   player.addListener('autoplay_failed',function(){
     if(!isCurrentPlayer())return;
     state.sdkActivated=false;
-    noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
+    state.sdkActivationPromise=null;
+    state.sdkActivationGeneration=0;
+    state.sdkTransferGeneration=0;
+    noteDiagnostic('sdk','sdk_activation',{reason:'autoplay',target:'here',outcome:'degraded'});
     setConnectionHealth('recovering','Tap play again','The browser blocked autoplay after the player changed.','Tap play once more to enable audio on this device.');
   });
-  player.addListener('playback_error',function(){
+  player.addListener('playback_error',function(payload){
     if(!isCurrentPlayer())return;
-    noteDiagnostic('playback','command_failed',{reason:'manual',target:'here',outcome:'failed'});
+    const reason=classifySdkPlaybackError(payload&&payload.message);
+    state.sdkPlaybackErrorCount=Math.min(9,(state.sdkPlaybackErrorCount||0)+1);
+    noteDiagnostic('playback','sdk_playback_error',{reason:reason,attempt:state.sdkPlaybackErrorCount,target:'here',outcome:'failed'});
+    if(state.sdkPlaybackErrorCount===1){
+      stageQueueRecoveryIfActive();
+      state.sdkPlaybackActive=false;
+      state.isPlaying=false;
+      state.sdkDeviceUnconfirmed=true;
+      state.sdkTransferGeneration=0;
+      if(reason==='autoplay'){
+        state.sdkActivated=false;
+        state.sdkActivationPromise=null;
+        state.sdkActivationGeneration=0;
+      }
+      try{Promise.resolve(player.pause()).catch(function(){});}catch{}
+      setConnectionHealth('recovering','Playback stopped safely','Spotify could not load audio, so CleanPlay stopped before skipping the rest of your queue.','Tap play to reconnect and retry.');
+    }
   });
   player.addListener('player_state_changed',function(sdkState){
     if(!isCurrentPlayer())return;
@@ -2291,6 +2317,7 @@ function createWebPlayer(){
     state.sdkPlaybackActive=!sdkState.paused;
     // iOS paused/zero loading states are not reliable end-of-track signals.
     if(!sdkState.paused){
+      state.sdkPlaybackErrorCount=0;
       state._lastSdkPlayingUri=current||state._lastSdkPlayingUri;
       if(current)consumeQueueLedger(current);
       startPolling();
@@ -2339,29 +2366,152 @@ function rebuildWebPlayerForGesture(){
 }
 function activateSdkAudio(){
   const player=state.webPlayer;
-  if(!player||typeof player.activateElement!=='function')return false;
+  if(!player||typeof player.activateElement!=='function')return Promise.resolve(false);
   const generation=state.sdkGeneration;
-  const isCurrent=function(){return state.webPlayer===player&&state.sdkGeneration===generation;};
+  const isCurrent=function(){return state.webPlayer===player&&state.sdkGeneration===generation&&state.sdkActivationPromise===work;};
+  let activation;
   try{
-    const activation=player.activateElement();
-    state.sdkActivated=true;
-    if(activation&&typeof activation.catch==='function'){
-      activation.catch(function(){
-        if(!isCurrent())return;
-        state.sdkActivated=false;
-        noteDiagnostic('sdk','sdk_not_ready',{reason:'gesture',target:'here',outcome:'degraded'});
-        setConnectionHealth('recovering','Tap play again','The browser did not enable audio on the first attempt.','Tap play once more to enable audio on this device.');
-      });
-    }
-    if(isCurrent())noteDiagnostic('lifecycle','visible',{reason:'gesture',target:'here',outcome:'ok'});
-    return true;
+    // This call must remain synchronous inside the user's tap on iOS.
+    activation=player.activateElement();
   }catch{
     state.sdkActivated=false;
-    return false;
+    state.sdkActivationPromise=null;
+    state.sdkActivationGeneration=0;
+    return Promise.resolve(false);
   }
+  state.sdkActivated=false;
+  state.sdkActivationGeneration=generation;
+  const work=Promise.resolve(activation).then(function(){
+    if(!isCurrent())return false;
+    state.sdkActivated=true;
+    state.sdkPlaybackErrorCount=0;
+    noteDiagnostic('sdk','sdk_activation',{reason:'gesture',target:'here',outcome:'ok'});
+    runPendingPlaybackIntent(generation);
+    return true;
+  }).catch(function(){
+    if(!isCurrent())return false;
+    state.sdkActivated=false;
+    state.sdkActivationPromise=null;
+    state.sdkActivationGeneration=0;
+    state.sdkTransferGeneration=0;
+    noteDiagnostic('sdk','sdk_activation',{reason:'autoplay',target:'here',outcome:'degraded'});
+    setConnectionHealth('recovering','Tap play again','The browser did not enable audio on the first attempt.','Tap play once more to enable audio on this device.');
+    return false;
+  });
+  state.sdkActivationPromise=work;
+  return work;
 }
 
 
+function queuePendingPlaybackIntent(label,run){
+  const pending={
+    id:(state.playbackIntentSequence||0)+1,
+    label:label,
+    run:run,
+    createdAt:Date.now(),
+    running:false,
+    promise:null
+  };
+  state.playbackIntentSequence=pending.id;
+  state.pendingPlaybackIntent=pending;
+  return pending;
+}
+function runPendingPlaybackIntent(generation){
+  const pending=state.pendingPlaybackIntent;
+  if(!pending||typeof pending.run!=='function')return Promise.resolve(false);
+  if(Date.now()-pending.createdAt>=20000){
+    if(state.pendingPlaybackIntent===pending)state.pendingPlaybackIntent=null;
+    setConnectionHealth('recovering','Tap play','The earlier playback request expired while this device was reconnecting.','Tap play to start audio on this device.');
+    return Promise.resolve(false);
+  }
+  if(pending.running)return pending.promise||Promise.resolve(false);
+  if(generation!==state.sdkGeneration||!state.sdkReady||!state.sdkActivated)return Promise.resolve(false);
+  pending.running=true;
+  let work;
+  work=Promise.resolve(state.sdkActivationGeneration===generation?state.sdkActivationPromise:true).then(function(activated){
+    if(activated===false||state.pendingPlaybackIntent!==pending||generation!==state.sdkGeneration)return false;
+    return ensureLocalPlaybackRoute(generation);
+  }).then(function(routed){
+    if(!routed||state.pendingPlaybackIntent!==pending||generation!==state.sdkGeneration)return false;
+    return pending.run();
+  }).then(function(ok){
+    if(state.pendingPlaybackIntent!==pending)return false;
+    if(ok){state.pendingPlaybackIntent=null;return true;}
+    pending.running=false;
+    setConnectionHealth('recovering','Tap play again','Your selection is still saved, but this device did not accept it.','Tap play again to reconnect and retry your selection.');
+    return false;
+  }).catch(function(){
+    if(state.pendingPlaybackIntent===pending)pending.running=false;
+    return false;
+  });
+  pending.promise=work;
+  return work;
+}
+function classifySdkPlaybackError(message){
+  const value=String(message||'').toLowerCase();
+  if(/autoplay|not.?allowed|user.?gesture|activation|interact/.test(value))return 'autoplay';
+  if(/encrypted media|key.?system|\beme\b|\bdrm\b/.test(value))return 'eme';
+  if(/license|fairplay|decrypt/.test(value))return 'license';
+  if(/network|offline|timeout|connection/.test(value))return 'network';
+  if(/unavailable|not.?playable|failed.{0,12}(load|play)|track/.test(value))return 'track_unavailable';
+  return 'unknown';
+}
+function sdkRouteDelay(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
+async function ensureLocalPlaybackRoute(generation,options){
+  const force=!!(options&&options.force);
+  if(generation!==state.sdkGeneration)return false;
+  if(!force&&state.sdkTransferGeneration===generation&&!state.sdkDeviceUnconfirmed)return true;
+  if(state.sdkTransferPromise)return state.sdkTransferPromise;
+  let work;
+  work=(async function(){
+    const activation=state.sdkActivationGeneration===generation?state.sdkActivationPromise:null;
+    const activated=activation?await activation:state.sdkActivated;
+    if(!activated||generation!==state.sdkGeneration||!state.webPlayer){
+      noteDiagnostic('sdk','sdk_transfer',{reason:'autoplay',target:'here',outcome:'degraded'});
+      return false;
+    }
+    if(!state.sdkReady&&state.sdkReadyPromise&&state.sdkReadyGeneration===generation)await state.sdkReadyPromise;
+    const deviceId=state.cleanplayDeviceId;
+    if(generation!==state.sdkGeneration||!state.sdkReady||!deviceId)return false;
+    let listed=false;
+    let listFailure={};
+    const delays=[0,250,500,750];
+    for(let index=0;index<delays.length;index++){
+      if(delays[index])await sdkRouteDelay(delays[index]);
+      if(generation!==state.sdkGeneration)return false;
+      listFailure={};
+      const data=await api('/me/player/devices','GET',null,{silent:true,failureSink:listFailure});
+      if(data&&Array.isArray(data.devices)&&data.devices.some(function(device){return device&&device.id===deviceId&&device.is_restricted!==true;})){
+        listed=true;
+        break;
+      }
+      if(listFailure.status&&listFailure.status!==404)break;
+    }
+    if(!listed){
+      state.sdkDeviceUnconfirmed=true;
+      state.sdkTransferGeneration=0;
+      noteDiagnostic('sdk','sdk_transfer',{status:listFailure.status||0,reason:listFailure.status===0?'network':'device_missing',target:'here',outcome:'degraded'});
+      return false;
+    }
+    const transferFailure={};
+    const result=await api('/me/player','PUT',{device_ids:[deviceId],play:false},{silent:true,failureSink:transferFailure});
+    if(result===null||generation!==state.sdkGeneration||state.cleanplayDeviceId!==deviceId){
+      state.sdkDeviceUnconfirmed=true;
+      state.sdkTransferGeneration=0;
+      noteDiagnostic('sdk','sdk_transfer',{status:transferFailure.status||0,reason:transferFailure.status===0?'network':'device_missing',target:'here',outcome:'degraded'});
+      return false;
+    }
+    state.sdkTransferGeneration=generation;
+    state.sdkDeviceUnconfirmed=false;
+    state.activeDeviceId=deviceId;
+    state.activeDeviceName='CleanPlay - this device';
+    state.activeDeviceType='Computer';
+    noteDiagnostic('sdk','sdk_transfer',{reason:'gesture',target:'here',outcome:'ok'});
+    return generation===state.sdkGeneration&&state.cleanplayDeviceId===deviceId;
+  })().finally(function(){if(state.sdkTransferPromise===work)state.sdkTransferPromise=null;});
+  state.sdkTransferPromise=work;
+  return work;
+}
 async function reconcileDevices(guard){
   const data=await api('/me/player/devices','GET',null,{silent:true});
   if(typeof guard==='function'&&!guard())return false;
@@ -2374,10 +2524,8 @@ async function reconcileDevices(guard){
     if(state.preferredTarget.kind==='here'){
       const localListed=!!localId&&devices.some(function(device){return device.id===localId;});
       if(state.sdkReady&&localId&&localListed){
-        // Preserve the existing SDK session and its queue when Spotify still
-        // lists this exact player. A genuine 404/not_ready remains authoritative
-        // and will use the bounded replacement path.
-        state.sdkDeviceUnconfirmed=false;
+        // Discovery proves the generation exists, but only an explicit transfer
+        // after user activation confirms that the Player API can route to it.
         state.activeDeviceId=localId;
       state.activeDeviceName='CleanPlay - this device';
       state.activeDeviceType='Computer';
@@ -2457,16 +2605,17 @@ function resumeSession(reason,options){
       return false;
     }
     if(state.preferredTarget.kind==='here'){
-      // `player_state_changed(null)` and getCurrentState() === null are normal
-      // for a ready device with no playback context. Rebuild only after a real
-      // lifecycle/not_ready signal. If a Play tap already created and activated
-      // a player, let that in-flight connection finish instead of replacing it
-      // with an unactivated instance and losing the user's gesture.
-      if(!state.webPlayer||state.needsSdkRecovery)await rebuildWebPlayer(reason);
-      else if(!state.sdkReady&&state.sdkReadyPromise){
+      // iOS only grants audio activation to a direct user action. Foreground
+      // recovery may verify the account and warm the SDK, but must not create a
+      // replacement player that has already lost the user's gesture.
+      if(!window.Spotify||!window.Spotify.Player)loadSpotifySdk({silent:true}).catch(function(){});
+      if(state.webPlayer&&!state.needsSdkRecovery&&!state.sdkDeviceUnconfirmed&&!state.sdkReady&&state.sdkReadyPromise){
         const becameReady=await state.sdkReadyPromise;
-        if(!becameReady&&isCurrentAttempt())await rebuildWebPlayer(reason);
-      }else if(!state.sdkReady)await rebuildWebPlayer(reason);
+        if(!becameReady&&isCurrentAttempt())state.sdkDeviceUnconfirmed=true;
+      }
+      if(!state.webPlayer||state.needsSdkRecovery||state.sdkDeviceUnconfirmed){
+        noteDiagnostic('recovery','resume_degraded',{reason:reason,target:'here',outcome:'degraded'});
+      }
     }else if(state.webPlayer)disconnectWebPlayer();
     if(!isCurrentAttempt())return false;
     let deviceReady=await reconcileDevices(isCurrentAttempt);
@@ -2504,7 +2653,8 @@ function resumeSession(reason,options){
       return false;
     }
     noteDiagnostic('lifecycle','resume_ok',{reason:reason,target:state.preferredTarget.kind,outcome:'ok'});
-    if(deviceReady||state.currentTrackUri)setConnectionHealth('online','Connected','Spotify account and playback state are current.');
+    if(state.preferredTarget.kind==='here'&&(!state.webPlayer||state.needsSdkRecovery||state.sdkDeviceUnconfirmed))setConnectionHealth('recovering','Tap play','Your account is connected. A fresh tap will safely wake audio on this iPhone.','Tap play to reconnect this device.');
+    else if(deviceReady||state.currentTrackUri)setConnectionHealth('online','Connected','Spotify account and playback state are current.');
     else setConnectionHealth('online','Spotify connected','Start Spotify on a device, then choose it in CleanPlay.');
     return true;
   })();
@@ -2553,16 +2703,28 @@ async function playHere(){
     return false;
   }
 
-  if(!state.webPlayer)createWebPlayer();
-  else if(state.needsSdkRecovery)rebuildWebPlayerForGesture();
-  activateSdkAudio();
+  const needsReplacement=!state.webPlayer||state.needsSdkRecovery||state.sdkDeviceUnconfirmed;
+  const player=needsReplacement?rebuildWebPlayerForGesture():state.webPlayer;
+  if(!player)return false;
 
-  if(!state.sdkReady&&state.sdkReadyPromise){
-    setConnectionHealth('recovering','Preparing this device','Connecting the in-browser Spotify player.','Preparing playback on this device...');
+  const generation=state.sdkGeneration;
+  const activation=needsReplacement?state.sdkActivationPromise:activateSdkAudio();
+  setConnectionHealth('recovering','Preparing this device','Activating audio, registering the player, and selecting it.','Preparing playback on this device...');
+  const activated=await activation;
+  if(!activated||generation!==state.sdkGeneration){
+    setConnectionHealth('recovering','Tap Here again','The player needs one fresh tap to finish audio activation.','Tap Here once more to enable audio on this device.');
+    return false;
+  }
+  if(!state.sdkReady&&state.sdkReadyPromise&&state.sdkReadyGeneration===generation){
     await state.sdkReadyPromise;
   }
-  if(!state.sdkReady||!state.cleanplayDeviceId){
-    setConnectionHealth('recovering','Tap Here again','The player needs one fresh tap to finish audio activation.','Tap Here once more to enable audio on this device.');
+  if(!state.sdkReady||!state.cleanplayDeviceId||generation!==state.sdkGeneration){
+    setConnectionHealth('recovering','Tap Here again','Spotify did not finish registering this player.','Tap Here once more to reconnect this device.');
+    return false;
+  }
+  const routed=await ensureLocalPlaybackRoute(generation);
+  if(!routed){
+    setConnectionHealth('recovering','Tap Here again','Spotify found the player but could not route playback to it yet.','Tap Here once more to reconnect this device.');
     return false;
   }
   state.activeDeviceId=state.cleanplayDeviceId;
@@ -2580,11 +2742,13 @@ async function playHere(){
 function playbackTargetKind(){return state.activeDeviceId&&state.cleanplayDeviceId&&state.activeDeviceId===state.cleanplayDeviceId?'here':(state.activeDeviceId?'remote':'none');}
 function withPlaybackTarget(path){
   const id=state.activeDeviceId;
-  if(!id||id===state.cleanplayDeviceId&&!state.sdkReady)return path;
+  // A confirmed local generation was explicitly transferred and is now the
+  // active player; avoid Spotify's flaky mobile routing by stale device_id.
+  if(!id||id===state.cleanplayDeviceId)return path;
   return path+(path.includes('?')?'&':'?')+'device_id='+encodeURIComponent(id);
 }
 function devQS(initial){
-  if(!state.activeDeviceId||state.activeDeviceId===state.cleanplayDeviceId&&!state.sdkReady)return '';
+  if(!state.activeDeviceId||state.activeDeviceId===state.cleanplayDeviceId)return '';
   return (initial?'&':'?')+'device_id='+encodeURIComponent(state.activeDeviceId);
 }
 async function recoverPlaybackTarget(reason){
@@ -2606,35 +2770,36 @@ async function playerCommand(command,requestFactory){
       return false;
     }
   }
+  const initialGeneration=state.sdkGeneration;
+  const initialLocal=command!=='transfer'&&state.activeDeviceId&&state.activeDeviceId===state.cleanplayDeviceId;
+  if(initialLocal&&!await ensureLocalPlaybackRoute(initialGeneration)){
+    noteDiagnostic('playback','command_failed',{reason:'device_missing',target:'here',outcome:'failed'});
+    setConnectionHealth('recovering','Tap play again','Spotify has not finished routing playback to this browser. Your request is still saved.','Tap play again to reconnect and retry.');
+    return false;
+  }
   for(let attempt=0;attempt<2;attempt++){
-    const commandStartedVisible=isAppVisible();
     const commandSdkGeneration=state.sdkGeneration;
     const commandDeviceId=state.activeDeviceId;
     const localCommand=!!commandDeviceId&&commandDeviceId===state.cleanplayDeviceId;
     const request=requestFactory(),failure={};
     const result=await api(request.path,request.method||'PUT',request.body===undefined?null:request.body,{silent:true,failureSink:failure});
     if(result!==null){
-      if(commandStartedVisible&&isAppVisible()&&commandSdkGeneration===state.sdkGeneration&&commandDeviceId===state.cleanplayDeviceId)state.sdkDeviceUnconfirmed=false;
       noteDiagnostic('playback','command_ok',{attempt:attempt,target:playbackTargetKind(),outcome:'ok'});
       if(attempt)setConnectionHealth('online','Connected','Playback recovered on the selected device.');
       return true;
     }
-    const missingDevice=failure.status===404&&failure.reason==='device_missing';
+    const missingDevice=failure.status===404&&(failure.reason==='device_missing'||localCommand);
     if(missingDevice&&localCommand){
       if(attempt===0&&state.webPlayer&&state.sdkReady&&state.sdkGeneration===commandSdkGeneration){
+        state.sdkDeviceUnconfirmed=true;
+        state.sdkTransferGeneration=0;
         noteDiagnostic('playback','command_retry',{status:404,attempt:1,reason:'device_missing',target:'here',outcome:'retry'});
-        // A fresh SDK ready ID can take a moment to reach the Player API. Keep
-        // the activated media element and retry this exact target once.
-        await new Promise(function(resolve){const timer=setTimeout(resolve,500);if(timer&&typeof timer.ref==='function')timer.ref();});
-        if(state.webPlayer&&state.sdkReady&&state.sdkGeneration===commandSdkGeneration&&state.cleanplayDeviceId===commandDeviceId){
-          state.activeDeviceId=commandDeviceId;
-          continue;
-        }
+        if(await ensureLocalPlaybackRoute(commandSdkGeneration,{force:true}))continue;
       }
       stageQueueRecoveryIfActive();
       invalidateSdkDevice('device_missing',commandDeviceId);
       noteDiagnostic('playback','command_failed',{status:404,attempt:attempt,target:'here',outcome:'failed'});
-      setConnectionHealth('recovering','Tap play again','Spotify could not reach this browser player after a retry. Your remaining queue was kept.','Tap play again to register a fresh player.');
+      setConnectionHealth('recovering','Tap play again','Spotify could not reach this browser player after an explicit transfer. Your remaining queue was kept.','Tap play again to register a fresh player.');
       return false;
     }
     if(attempt===0&&missingDevice){
@@ -2653,8 +2818,6 @@ function preparePlaybackIntent(label,run){
   const canStartPlayback=label==='play'||label==='resume_last'||label.indexOf('play_')===0;
   let wantsHere=state.preferredTarget.kind==='here'||state.activeDeviceId&&state.activeDeviceId===state.cleanplayDeviceId;
   if(!wantsHere&&!state.activeDeviceId&&canStartPlayback){
-    // No Connect device exists. Use the same intentional tap to prepare the
-    // browser as the playback target instead of sending a targetless 404.
     setPreferredTarget('here');
     wantsHere=true;
     noteDiagnostic('recovery','command_retry',{reason:'device_missing',target:'here',outcome:'retry'});
@@ -2666,33 +2829,28 @@ function preparePlaybackIntent(label,run){
     }
     return false;
   }
-  if(state.needsSdkRecovery){
-    // Only an authoritative loss replaces the player. A ready-but-unlisted
-    // device gets the same-ID propagation retry before it is discarded.
-    state.pendingPlaybackIntent={label:label,run:run,createdAt:Date.now()};
-    if(window.Spotify&&window.Spotify.Player){
-      const replacement=rebuildWebPlayerForGesture();
-      if(replacement)state.needsSdkRecovery=false;
-    }else initWebPlayer();
+  queuePendingPlaybackIntent(label,run);
+  state.lifecycleReason='gesture';
+  if(!window.Spotify||!window.Spotify.Player){
+    initWebPlayer();
     noteDiagnostic('recovery','command_retry',{reason:'gesture',target:'here',outcome:'retry'});
-    setConnectionHealth('recovering','Waking player','Your request will start when this device is ready.','Reconnecting this device and starting your selection...');
+    setConnectionHealth('recovering','Tap play again','The audio engine is loading and will need one fresh tap.','Tap play once more when this device is ready.');
     return true;
   }
+  if(!state.webPlayer||state.needsSdkRecovery||state.sdkDeviceUnconfirmed)rebuildWebPlayerForGesture();
+  else activateSdkAudio();
+  const generation=state.sdkGeneration;
+  const activation=state.sdkActivationGeneration===generation?state.sdkActivationPromise:activateSdkAudio();
   if(state.sdkReady&&state.cleanplayDeviceId){
     state.activeDeviceId=state.cleanplayDeviceId;
     state.activeDeviceName='CleanPlay - this device';
     state.activeDeviceType='Computer';
-    activateSdkAudio();
-    state.pendingPlaybackIntent=null;
-    return false;
   }
-  state.pendingPlaybackIntent={label:label,run:run,createdAt:Date.now()};
-  if(window.Spotify&&window.Spotify.Player){
-    if(!state.webPlayer)createWebPlayer();
-    activateSdkAudio();
-  }else initWebPlayer();
+  Promise.resolve(activation).then(function(activated){
+    if(activated&&generation===state.sdkGeneration)runPendingPlaybackIntent(generation);
+  });
   noteDiagnostic('recovery','command_retry',{reason:'gesture',target:'here',outcome:'retry'});
-  setConnectionHealth('recovering','Waking player','Your request is saved and will run when this device is ready.','Waking the in-browser player. Your request is waiting...');
+  setConnectionHealth('recovering','Waking player','Activating audio, registering this iPhone, and routing your saved selection.','Reconnecting this device and starting your selection...');
   return true;
 }
 async function playBody(label,body){
@@ -3150,8 +3308,8 @@ const DIAGNOSTIC_SCHEMA_VERSION = 1;
 const DIAGNOSTIC_LIMIT = 250;
 const DIAGNOSTIC_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DIAGNOSTIC_CATEGORIES = new Set(['auth','network','api','sdk','lifecycle','recovery','playback','other']);
-const DIAGNOSTIC_EVENTS = new Set(['refresh_start','refresh_ok','refresh_transient','refresh_invalid','oauth_state_mismatch','api_ok','api_error','offline','online','sdk_load','sdk_connect','sdk_ready','sdk_not_ready','sdk_auth_error','sdk_rebuild','hidden','visible','pageshow','resume_start','resume_ok','resume_degraded','device_reconcile','command_retry','command_ok','command_failed','other']);
-const DIAGNOSTIC_REASONS = new Set(['wake','gesture','auth','not_ready','null_state','online','pageshow','visible','device_missing','token_expired','manual','none']);
+const DIAGNOSTIC_EVENTS = new Set(['refresh_start','refresh_ok','refresh_transient','refresh_invalid','oauth_state_mismatch','api_ok','api_error','offline','online','sdk_load','sdk_connect','sdk_ready','sdk_not_ready','sdk_auth_error','sdk_rebuild','sdk_activation','sdk_transfer','sdk_playback_error','hidden','visible','pageshow','resume_start','resume_ok','resume_degraded','device_reconcile','command_retry','command_ok','command_failed','other']);
+const DIAGNOSTIC_REASONS = new Set(['wake','gesture','auth','not_ready','null_state','online','pageshow','visible','device_missing','token_expired','autoplay','eme','license','track_unavailable','network','unknown','manual','none']);
 const DIAGNOSTIC_TARGETS = new Set(['here','remote','none']);
 const DIAGNOSTIC_OUTCOMES = new Set(['ok','retry','failed','degraded','none']);
 
@@ -3611,8 +3769,13 @@ async function decideNextScreen(){
 }
 
 function preserveLocalPlaybackOnSuspend(){
-  // Keep the Spotify SDK session and its queue intact through ordinary
-  // lock/unlock cycles. `not_ready` remains the disconnect authority.
+  // Let an already-playing queue continue, but expire the Player API route.
+  // Device IDs are not persistent enough to trust after an iPhone suspension.
+  if(state.preferredTarget.kind==='here'&&state.webPlayer&&state.cleanplayDeviceId){
+    state.sdkDeviceUnconfirmed=true;
+    state.sdkTransferGeneration=0;
+    state.sdkTransferPromise=null;
+  }
   if(localPlaybackNeedsWatchdog()){
     startPolling();
     return true;

@@ -4,7 +4,7 @@
 // before the previous one is removed, so an update never destroys the last
 // known-good offline shell.
 const CACHE_PREFIX = 'cleanplay-shell-';
-const CACHE_VERSION = '2026-07-23-2';
+const CACHE_VERSION = '2026-07-23-3';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
 // registration.scope makes every URL work both at a custom domain and under
