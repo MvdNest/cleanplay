@@ -2,7 +2,7 @@
 
 > Personal, text-only Spotify control. The app never renders album art or artist imagery.
 
-This document describes the v3.5 architecture and the constraints future changes must preserve.
+This document describes the v3.5.1 architecture and the constraints future changes must preserve.
 
 ## Deployment
 
@@ -253,3 +253,4 @@ An iOS wrapper around this web player would inherit the same suspension limits, 
 5. **v3.4** - restored single-media-session iPhone playback, serialized deliberate starts, and added a same-device retry for transient fresh-player `404`s.
 6. **v3.4.1** - stopped treating iPhone's transient paused-at-zero SDK states as ended tracks, serialized recovery, and reactivated the existing audio element on every deliberate playback tap after wake.
 7. **v3.5** - replaced stale-ID retries with a user-activation, exact-device discovery, explicit-transfer, then-play handshake; retained the latest intent and stopped SDK error skip storms after the first failure.
+8. **v3.5.1** - added a short transfer-settle barrier for Spotify's unordered Player API operations and clears the reconnect banner as soon as the pending selection succeeds.

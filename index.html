@@ -568,7 +568,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.5 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.5.1 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -2436,7 +2436,11 @@ function runPendingPlaybackIntent(generation){
     return pending.run();
   }).then(function(ok){
     if(state.pendingPlaybackIntent!==pending)return false;
-    if(ok){state.pendingPlaybackIntent=null;return true;}
+    if(ok){
+      state.pendingPlaybackIntent=null;
+      setConnectionHealth('online','Connected','Your selection is active on this device.');
+      return true;
+    }
     pending.running=false;
     setConnectionHealth('recovering','Tap play again','Your selection is still saved, but this device did not accept it.','Tap play again to reconnect and retry your selection.');
     return false;
@@ -2507,6 +2511,10 @@ async function ensureLocalPlaybackRoute(generation,options){
     state.activeDeviceName='CleanPlay - this device';
     state.activeDeviceType='Computer';
     noteDiagnostic('sdk','sdk_transfer',{reason:'gesture',target:'here',outcome:'ok'});
+    // Spotify does not guarantee ordering across Player API endpoints. Give
+    // the accepted transfer a short window to become active before Start
+    // Playback, otherwise the late transfer can re-pause the new selection.
+    await sdkRouteDelay(500);
     return generation===state.sdkGeneration&&state.cleanplayDeviceId===deviceId;
   })().finally(function(){if(state.sdkTransferPromise===work)state.sdkTransferPromise=null;});
   state.sdkTransferPromise=work;
