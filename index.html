@@ -568,7 +568,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.6.1 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.6.2 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -3857,11 +3857,11 @@ async function decideNextScreen(){
 }
 
 function preserveLocalPlaybackOnSuspend(){
-  // Let an already-playing queue continue, but expire the Player API route.
-  // Device IDs are not persistent enough to trust after an iPhone suspension.
+  // Keep a proven local route while iOS suspends this page. Proactively
+  // invalidating it made the next tap destroy a healthy player and replace it
+  // with a fresh ID that Spotify's Player API had not registered yet. The SDK's
+  // not_ready event or an explicit playback 404 remains authoritative.
   if(state.preferredTarget.kind==='here'&&state.webPlayer&&state.cleanplayDeviceId){
-    state.sdkDeviceUnconfirmed=true;
-    state.sdkTransferGeneration=0;
     state.sdkTransferEpoch=(state.sdkTransferEpoch||0)+1;
     state.sdkTransferPromise=null;
   }
