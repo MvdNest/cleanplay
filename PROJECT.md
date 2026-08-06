@@ -2,7 +2,7 @@
 
 > Personal, text-only Spotify control. The app never renders album art or artist imagery.
 
-This document describes the v3.5.2 architecture and the constraints future changes must preserve.
+This document describes the v3.6.0 architecture and the constraints future changes must preserve.
 
 ## Deployment
 
@@ -255,3 +255,4 @@ An iOS wrapper around this web player would inherit the same suspension limits, 
 7. **v3.5** - replaced stale-ID retries with a user-activation, exact-device discovery, explicit-transfer, then-play handshake; retained the latest intent and stopped SDK error skip storms after the first failure.
 8. **v3.5.1** - added a short transfer-settle barrier for Spotify's unordered Player API operations and clears the reconnect banner as soon as the pending selection succeeds.
 9. **v3.5.2** - removed the eventually-consistent `/devices` gate after SDK readiness and directly retries the authoritative transfer on a fresh activated generation.
+10. **v3.6.0** - adds direct Start Playback fallback for fresh iPhone SDK devices, an SDK-native resume check, synchronous gesture activation, single-flight playback guards, queued-track preservation, and non-disruptive service-worker activation.

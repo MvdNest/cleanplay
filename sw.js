@@ -4,7 +4,7 @@
 // before the previous one is removed, so an update never destroys the last
 // known-good offline shell.
 const CACHE_PREFIX = 'cleanplay-shell-';
-const CACHE_VERSION = '2026-07-23-5';
+const CACHE_VERSION = '2026-08-06-1';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
 // registration.scope makes every URL work both at a custom domain and under
@@ -57,7 +57,6 @@ self.addEventListener('install', (event) => {
     const cache = await caches.open(CACHE_NAME);
     const requests = APP_SHELL.map((url) => new Request(url, { cache: 'reload' }));
     await cache.addAll(requests);
-    await self.skipWaiting();
   })());
 });
 
