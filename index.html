@@ -568,7 +568,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.6.0 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.6.1 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -2310,17 +2310,18 @@ function createWebPlayer(){
       stageQueueRecoveryIfActive();
       state.sdkPlaybackActive=false;
       state.isPlaying=false;
-      state.sdkDeviceUnconfirmed=true;
-      state.sdkTransferEpoch=(state.sdkTransferEpoch||0)+1;
-      state.sdkTransferPromise=null;
-      state.sdkTransferGeneration=0;
+      // playback_error describes a track/audio failure, not a disconnected
+      // Spotify Connect device. The previous Start Playback and transfer may
+      // already have proved this exact ID. Invalidating it here made the next
+      // iPhone tap destroy a healthy player and enter a fresh-device 404 loop.
+      // Only not_ready or an explicit Player API 404 may invalidate the route.
       if(reason==='autoplay'){
         state.sdkActivated=false;
         state.sdkActivationPromise=null;
         state.sdkActivationGeneration=0;
       }
       try{Promise.resolve(player.pause()).catch(function(){});}catch{}
-      setConnectionHealth('recovering','Playback stopped safely','Spotify could not load audio, so CleanPlay stopped before skipping the rest of your queue.','Tap play to reconnect and retry.');
+      setConnectionHealth('recovering','Playback paused safely','Spotify could not load audio, so CleanPlay kept this player and stopped before skipping the rest of your queue.','Tap play to retry on this device.');
     }
   });
   player.addListener('player_state_changed',function(sdkState){
