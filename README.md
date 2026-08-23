@@ -38,7 +38,7 @@ The deployed app's setup screen walks through the same process.
 
 Listen Later is stored only in this browser under `cp_saved_v1`. It is intentionally separate from the Spotify library: there is no account sync, and clearing site data or using another browser removes or hides that browser's list.
 
-Diagnostics are stored locally under `cp_diag_v1`. Entries are bounded and redacted: they record operational events and status codes, not access tokens, refresh tokens, authorization codes, Spotify URIs, searches, music names, or personal account data. Nothing is uploaded automatically. Use the Settings controls to copy or clear the log when troubleshooting. Lyrics are also opt-in: only opening the Lyrics panel sends the current title, artist, album, and duration to LRCLIB.
+Diagnostics are stored locally under `cp_diag_v2`. Entries are bounded and redacted: they record operational events, command classes, route generations, latency buckets, and status codes—not access tokens, refresh tokens, authorization codes, device IDs, Spotify URIs, searches, music names, or personal account data. Nothing is uploaded automatically. Use the Settings controls to copy or clear the log when troubleshooting. Lyrics are also opt-in: only opening the Lyrics panel sends the current title, artist, album, and duration to LRCLIB.
 
 ## Album-art boundary
 
@@ -51,6 +51,8 @@ CleanPlay itself never renders Spotify artwork. Brand icons used to install the 
 - `sw.js` - tightly scoped app-shell caching
 - `icons/` - CleanPlay brand icons
 - `PROJECT.md` - architecture, API notes, and maintenance guide
+- `tests/` and `package.json` - dependency-free deterministic regression checks (`npm test`)
+- `tools/analyze-diagnostics.mjs` - offline summary of a copied diagnostic export (`npm run analyze:diagnostics -- <file>`)
 
 There is no build step. GitHub Pages serves the repository as static files.
 

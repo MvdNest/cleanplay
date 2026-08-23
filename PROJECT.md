@@ -2,7 +2,7 @@
 
 > Personal, text-only Spotify control. The app never renders album art or artist imagery.
 
-This document describes the v3.6.2 architecture and the constraints future changes must preserve.
+This document describes the v3.7.0 architecture and the constraints future changes must preserve.
 
 ## Deployment
 
@@ -96,19 +96,20 @@ Official references:
 
 The original iPhone failure was a PWA waking with an access token or SDK device ID that had stopped being valid during lock. Player calls then returned `401`, `404`, `NO_ACTIVE_DEVICE`, or "device not found."
 
-v3.5 recovery follows these rules:
+v3.7 recovery follows these rules:
 
 1. Serialize foreground/network recovery so several lifecycle signals cannot race. A foreground or manual retry supersedes work that was suspended while hidden, and every network/recovery attempt is bounded.
 2. Refresh authorization first when necessary; do not sign out for a transient failure.
-3. Preserve an already-playing SDK queue while hidden, but expire its Player API route on `hidden`/`pagehide`. Do not disconnect merely because the screen locked. Spotify's SDK remains the only audio element.
+3. Preserve an already-playing SDK queue and player while hidden, but expire its Player API route lease on `hidden`/`pagehide` and stop hidden polling. Do not disconnect merely because the screen locked. Spotify's SDK remains the only audio element.
 4. Foreground recovery may verify identity, refresh state, and warm the SDK script, but it must not construct an unactivated replacement player. Only a direct user action can do that safely on iOS.
 5. On each deliberate local playback gesture, call `activateElement()` synchronously and await its Promise. Rebuild the player in that same gesture if the previous route is unconfirmed or an authoritative loss occurred.
 6. Treat the current SDK generation's `ready` event as the source of its device ID. `/devices` is advisory and may lag on iPhone; never use it as a prerequisite for transfer. After activation, explicitly transfer with `PUT /me/player` and `play:false`, retry only a bounded fresh-generation `404`, and cancel that route lease on hide, offline, or generation change before sending playback without a stale `device_id` query.
 7. Maintain `cp_queue_ledger_v1`, an ordered local ledger of CleanPlay-queued URIs. Use one `/play` URI sequence to restore an explicitly resumed interrupted session or the current item and remaining sequence after an unavoidable replacement.
 8. A deliberate selection is a generation-scoped pending intent. The newest selection owns exactly one `/play` command and never inherits a stale recovery plan.
 9. A local `404` gets one bounded explicit re-transfer before replacement; it never retries the same unconfirmed ID blindly. Remote targets may retry once after device reconciliation.
-10. Classify SDK playback errors into redacted categories. Pause on the first error so a failed media load cannot silently burn through the remaining queue.
-11. Restart ordinary polling after recovery settles. A null `player_state_changed` payload or a paused-at-zero transition is not evidence that a track ended.
+10. Treat a Player API success as accepted, not audible. Retain the latest pending selection until the current SDK generation reports non-paused playback; a silent SDK must never be labelled Connected.
+11. Classify SDK playback errors into redacted categories. Pause on the first error so a failed media load cannot silently burn through the remaining queue.
+12. Restart ordinary polling after recovery settles. Polling is read-only: a null/204 state, null `player_state_changed` payload, or paused-at-zero transition is never permission to synthesize `/next` or `/play`.
 
 Keep recovery idempotent and visible in diagnostics. iOS still requires `player.activateElement()` during a real tap before in-browser audio starts; automated wake logic cannot manufacture that gesture.
 
@@ -168,7 +169,7 @@ Parsing and migration must tolerate malformed or older entries without breaking 
 
 ## Local diagnostics
 
-`cp_diag_v1` is a bounded local audit log for intermittent wake/reconnect failures. Useful events include lifecycle/online state, refresh outcomes, redacted API status classes, SDK ready/not-ready/reconnect, device routing, and service-worker state.
+`cp_diag_v2` is a bounded local audit log for intermittent wake/reconnect failures. Useful events include lifecycle/online state, refresh outcomes, redacted API status classes, SDK ready/not-ready/reconnect, route generations, command classes, latency buckets, and whether local playback became audible. Older `cp_diag_v1` entries are read for migration until diagnostics are cleared.
 
 Privacy requirements:
 
@@ -193,7 +194,7 @@ Privacy requirements:
 | `cp_last_played` | Local resume metadata |
 | `cp_search_history` | Recent local searches |
 | `cp_saved_v1` | Versioned Listen Later collection |
-| `cp_diag_v1` | Versioned, redacted diagnostic log |
+| `cp_diag_v2` | Versioned, redacted diagnostic log with session-local correlation fields |
 
 Treat OAuth values as sensitive. SDK device IDs must remain session-only. Signing out clears auth; clearing preferences or Listen Later should be a separate explicit action.
 
@@ -258,3 +259,4 @@ An iOS wrapper around this web player would inherit the same suspension limits, 
 10. **v3.6.0** - adds direct Start Playback fallback for fresh iPhone SDK devices, an SDK-native resume check, synchronous gesture activation, single-flight playback guards, queued-track preservation, and non-disruptive service-worker activation.
 11. **v3.6.1** - keeps a proven SDK device route after a track/audio `playback_error`; only `not_ready` or an explicit Player API 404 can invalidate the iPhone player, preventing healthy-player rebuild loops.
 12. **v3.6.2** - preserves a proven SDK route across ordinary iPhone suspension so the first post-unlock tap reuses the registered player instead of replacing it with an unregistered device ID.
+13. **v3.7.0** - removes duplicate legacy implementations and polling-driven skip commands, serializes playback writes, expires only the route lease on lock, retains silent playback intents, verifies SDK audibility, unifies SDK loading, and adds deterministic regression tests plus redacted diagnostics v2.
