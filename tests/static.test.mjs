@@ -47,3 +47,16 @@ test('PWA remains standalone and the service worker ignores Spotify traffic', ()
   assert.match(serviceWorker, /url\.origin !== self\.location\.origin/);
   assert.doesNotMatch(serviceWorker, /skipWaiting\(\).*install/s);
 });
+
+test('the document owns page scrolling without a body scroll-chain trap', () => {
+  const css = html.match(/<style>([\s\S]*?)<\/style>/)[1];
+  assert.match(css, /html\{overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:none\}/);
+  for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (rule[1].split(',').some(selector => selector.trim() === 'body')) {
+      assert.doesNotMatch(rule[2], /(?:overflow|overscroll-behavior)(?:-[xy])?\s*:/);
+    }
+  }
+  assert.match(css, /\.ctrl,\.tab,\.device-bar button,\.detail-back,\.up-next-link\{touch-action:manipulation\}/);
+  assert.match(css, /env\(safe-area-inset-bottom,0px\)/);
+  assert.doesNotMatch(html, /addEventListener\(['"](?:wheel|mousewheel|touchmove)['"]/);
+});

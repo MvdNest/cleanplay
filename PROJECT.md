@@ -2,7 +2,7 @@
 
 > Personal, text-only Spotify control. The app never renders album art or artist imagery.
 
-This document describes the v3.8.1 architecture and the constraints future changes must preserve.
+This document describes the v3.8.2 architecture and the constraints future changes must preserve.
 
 ## Deployment
 
@@ -211,6 +211,8 @@ The responsive UI uses bottom navigation on iPhone and a sidebar on wide screens
 
 Keep 44px-class tap targets, safe-area insets, visible keyboard focus, and reduced-motion support. Avoid hover-only actions.
 
+The document root owns vertical page scrolling. Keep horizontal clipping and overscroll suppression on `html`, not `body`: clipping on both elements makes the body an extra scroll container, and body overscroll suppression can trap wheel/touch scrolling before it reaches the document. Retain native scrolling inside lyrics, diagnostics, and modals; do not add wheel/touch interception.
+
 ## Troubleshooting
 
 | Symptom | Meaning | Recovery |
@@ -262,3 +264,4 @@ An iOS wrapper around this web player would inherit the same suspension limits, 
 13. **v3.7.0** - removes duplicate legacy implementations and polling-driven skip commands, serializes playback writes, expires only the route lease on lock, retains silent playback intents, verifies SDK audibility, unifies SDK loading, and adds deterministic regression tests plus redacted diagnostics v2.
 14. **v3.8.0** - treats long-suspended SDK registrations as unconfirmed, keeps local commands pinned to an explicit device, waits through bounded fresh-device registration, requires real SDK position progress before declaring audio audible, preserves recovery queues across longer locks, and records standalone/progress evidence in diagnostics.
 15. **v3.8.1** - confines time-based player replacement to iOS, preserves desktop players after backgrounding, and shares exhausted registration results across Here/Retry/new-song clicks to prevent duplicate transfer loops. Retry can directly play the remembered selection after a transfer-only 404.
+16. **v3.8.2** - restores native wheel scrolling in Edge by removing the body scroll-chain trap. Keeps iPhone safe-area spacing, touch controls, bottom navigation, and all playback JavaScript unchanged.

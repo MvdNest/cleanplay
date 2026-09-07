@@ -18,7 +18,10 @@
 <style>
 :root{--bg:#0d0d0e;--bg-warm:#131312;--surface:#19191b;--surface-2:#222225;--border:#343438;--border-soft:#242428;--text:#f7f5ee;--text-soft:#d0cec6;--muted:#929198;--muted-dim:#626168;--accent:#d9ad5b;--accent-bright:#efc875;--accent-dim:#92733a;--accent-soft:rgba(217,173,91,0.13);--danger:#ef8585;--success:#80c99b;--serif:ui-serif,'New York','Iowan Old Style','Palatino Linotype',Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;--mono:ui-monospace,'SFMono-Regular','SF Mono',Menlo,Consolas,monospace;--max-width:1280px;--sidebar-width:240px;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overflow-x:hidden}
+html,body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+/* Keep the document as the page scroller. overflow-x:hidden on body creates
+   a second scroll container; overscroll:none there traps wheel/touch input. */
+html{overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:none}
 body{background:radial-gradient(ellipse at top,rgba(212,164,73,0.04),transparent 50%),radial-gradient(ellipse at bottom right,rgba(212,164,73,0.02),transparent 50%),var(--bg);background-attachment:fixed;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
 button{font:inherit;cursor:pointer}
 input,textarea{font-family:inherit}
@@ -259,7 +262,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent-bright);
 .btn-primary,.btn-ghost,.btn-accent,.status-chip,.save-btn,.filter-pill,.sh-chip,.tab,.ctrl,.icon-btn,.search-box button,.device-bar button,.detail-back,.up-next-link,.modal-close,.timer-btn,.lyrics-toggle{min-height:44px}
 .sh-clear,.modal-close{min-width:44px;min-height:44px}
 @media(hover:hover){.icon-btn:hover{background:var(--surface-2)}}
-body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
+body{text-rendering:optimizeLegibility}
 .header{min-height:58px;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));box-shadow:0 1px 0 rgba(255,255,255,.015)}
 .header-brand{letter-spacing:-.8px}
 .header-status{min-width:0}
@@ -568,7 +571,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.8.1 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.8.2 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>

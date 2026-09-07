@@ -1,6 +1,6 @@
 {
   "name": "cleanplay",
-  "version": "3.8.1",
+  "version": "3.8.2",
   "private": true,
   "description": "Deterministic checks for the CleanPlay static PWA",
   "scripts": {
