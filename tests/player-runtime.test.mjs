@@ -114,6 +114,7 @@ test('a meaningful suspension keeps the player until a tap but marks its route u
   const context = contextWith({
     state,
     Date: { now: () => 121000 },
+    usesIosPlaybackLifecycle: () => true,
     LOCAL_PLAYER_STALE_AFTER_SUSPEND_MS: 60000
   });
   loadFunctions(context, ['consumeLocalSuspend']);
@@ -125,6 +126,43 @@ test('a meaningful suspension keeps the player until a tap but marks its route u
   assert.equal(state.needsPlaybackResume, true);
   assert.equal(state.sdkTransferGeneration, 0);
   assert.equal(state.sdkRouteLeaseEpoch, -1);
+});
+
+test('a desktop return after 36 minutes and two missing discovery rows preserves the SDK player', async () => {
+  const player = {};
+  const state = {
+    preferredTarget: { kind: 'here' }, webPlayer: player, cleanplayDeviceId: 'desktop-id',
+    sdkGeneration: 2, sdkReady: true, sdkActivated: true, needsSdkRecovery: false,
+    suspendedAt: 1000, sdkDeviceUnconfirmed: false, sdkTransferGeneration: 2,
+    sdkTransferEpoch: 2, sdkRouteLeaseEpoch: 1, resumeGeneration: 0
+  };
+  let discoveryCalls = 0;
+  const context = contextWith({
+    state, Date: { now: () => 2161000 },
+    navigator: { userAgent: 'Windows NT 10.0 Edg/140', platform: 'Win32', onLine: true },
+    window: { Spotify: { Player: function Player() {} } },
+    LOCAL_PLAYER_STALE_AFTER_SUSPEND_MS: 60000,
+    isAppVisible: () => true,
+    ensureToken: async () => true, verifyIdentityFirst: async () => true,
+    reconcileDevices: async () => { discoveryCalls += 1; return false; },
+    fetchState: async () => true, startPolling: () => {},
+    noteDiagnostic: () => {}, setConnectionHealth: () => {},
+    setTimeout: (callback, delay) => delay === 450 ? setTimeout(callback, 0) : setTimeout(callback, delay)
+  });
+  loadFunctions(context, ['usesIosPlaybackLifecycle', 'consumeLocalSuspend', 'resumeSession']);
+  assert.equal(context.consumeLocalSuspend(), 2160000);
+  assert.equal(await context.resumeSession('visible'), true);
+  assert.equal(discoveryCalls, 2);
+  assert.equal(state.webPlayer, player);
+  assert.equal(state.cleanplayDeviceId, 'desktop-id');
+  assert.equal(state.sdkDeviceUnconfirmed, false);
+  assert.equal(state.needsSdkRecovery, false);
+});
+
+test('iPad desktop user agent still uses iOS suspension recovery', () => {
+  const context = contextWith({ navigator: { userAgent: 'Macintosh', platform: 'MacIntel', maxTouchPoints: 5 } });
+  loadFunctions(context, ['usesIosPlaybackLifecycle']);
+  assert.equal(context.usesIosPlaybackLifecycle(), true);
 });
 
 test('route confirmation is a generation-and-epoch lease', () => {
@@ -782,6 +820,88 @@ test('a local play 404 does not repeat the exhausted transfer/play chain', async
   assert.equal(invalidations, 1);
 });
 
+test('Here followed by two playback clicks shares one 404 window and plays only the latest selection', async () => {
+  let releaseTransfer;
+  let enteredTransfer;
+  const transferGate = new Promise(resolve => { releaseTransfer = resolve; });
+  const started = new Promise(resolve => { enteredTransfer = resolve; });
+  const requests = [];
+  const state = {
+    playerCommandSequence: 0, playerCommandTail: null,
+    preferredTarget: { kind: 'here' }, activeDeviceId: 'desktop-id', cleanplayDeviceId: 'desktop-id',
+    sdkGeneration: 2, sdkReady: true, sdkActivated: true, webPlayer: {},
+    sdkActivationGeneration: 2, sdkActivationPromise: Promise.resolve(true),
+    sdkTransferGeneration: 0, sdkTransferEpoch: 2, sdkRouteLeaseEpoch: -1,
+    sdkDeviceUnconfirmed: false, sdkTransferPromise: null, accessToken: 'present'
+  };
+  const context = contextWith({
+    state, navigator: { onLine: true }, isAppVisible: () => true,
+    sdkRouteDelay: async () => {}, noteDiagnostic: () => {}, setConnectionHealth: () => {},
+    playbackTargetKind: () => 'here', ensureSdkPlaybackAudible: async () => true,
+    api: async (path, method, body, options) => {
+      requests.push({ path, body });
+      if (path === '/me/player') {
+        enteredTransfer();
+        await transferGate;
+        options.failureSink.status = 404;
+        options.failureSink.reason = 'device_missing';
+        return null;
+      }
+      return {};
+    }
+  });
+  loadFunctions(context, [
+    'sdkTransferFailureReason', 'localRouteLeaseIsCurrent', 'ensureLocalPlaybackRoute',
+    'withPlaybackTarget', 'isStartPlaybackCommand', 'commandSupersedesPlayback',
+    'expectedPlaybackUri', 'expectedPlaybackContext', 'executePlayerCommand', 'playerCommand'
+  ]);
+  const here = context.ensureLocalPlaybackRoute(2);
+  await started;
+  const older = context.playerCommand('play_track', () => ({ path: context.withPlaybackTarget('/me/player/play'), body: { uris: ['spotify:track:OLD'] } }));
+  // Let the first command enter preflight before the second supersedes it.
+  await Promise.resolve();
+  await Promise.resolve();
+  const newest = context.playerCommand('play_track', () => ({ path: context.withPlaybackTarget('/me/player/play'), body: { uris: ['spotify:track:NEW'] } }));
+  releaseTransfer();
+  assert.equal(await here, false);
+  assert.equal(await older, false);
+  assert.equal(await newest, true);
+  assert.equal(requests.filter(request => request.path === '/me/player').length, 5);
+  const plays = requests.filter(request => request.path.includes('/me/player/play'));
+  assert.equal(plays.length, 1);
+  assert.equal(plays[0].path, '/me/player/play?device_id=desktop-id');
+  assert.equal(plays[0].body.uris[0], 'spotify:track:NEW');
+  assert.equal(state.sdkRouteFailure, null);
+  assert.equal(state.sdkDeviceUnconfirmed, false);
+});
+
+test('concurrent route callers do not retry a shared non-404 transfer failure', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let transfers = 0;
+  const state = {
+    sdkGeneration: 2, sdkReady: true, sdkActivated: true, webPlayer: {}, cleanplayDeviceId: 'desktop-id',
+    sdkTransferEpoch: 2, sdkRouteLeaseEpoch: -1, sdkTransferGeneration: 0
+  };
+  const context = contextWith({
+    state, navigator: { onLine: true }, isAppVisible: () => true,
+    noteDiagnostic: () => {}, setConnectionHealth: () => {}, sdkRouteDelay: async () => {},
+    api: async (path, method, body, options) => {
+      transfers += 1;
+      await gate;
+      options.failureSink.status = 429;
+      return null;
+    }
+  });
+  loadFunctions(context, ['sdkTransferFailureReason', 'localRouteLeaseIsCurrent', 'ensureLocalPlaybackRoute']);
+  const here = context.ensureLocalPlaybackRoute(2);
+  const play = context.ensureLocalPlaybackRoute(2, { allowDirectPlay: true });
+  release();
+  assert.equal(await here, false);
+  assert.equal(await play, false);
+  assert.equal(transfers, 1);
+});
+
 test('concurrent token refresh callers share one request', async () => {
   let fetches = 0;
   let saves = 0;
@@ -918,6 +1038,29 @@ test('the Retry banner resumes staged playback when no pending intent exists', a
   assert.equal(await context.retryConnectionFromGesture(), true);
   assert.equal(replay.label, 'resume_last');
   assert.deepEqual(Array.from(replay.body.uris), ['spotify:track:A']);
+});
+
+test('Retry after a transfer-only 404 plays the retained selection without requiring a new search', async () => {
+  let replay = null;
+  let hereCalls = 0;
+  const state = {
+    preferredTarget: { kind: 'here' }, pendingPlaybackIntent: null, needsPlaybackResume: false,
+    sdkGeneration: 2, sdkTransferEpoch: 3, sdkRouteFailure: { generation: 2, epoch: 3, status: 404 }
+  };
+  const context = contextWith({
+    state, cancelForegroundResumeForGesture: () => {}, activeQueueRecoveryPlan: () => null,
+    lastPlayedBody: () => ({ uris: ['spotify:track:A'] }),
+    playBody: async (label, body) => { replay = { label, body }; return true; },
+    playHere: () => { hereCalls += 1; return false; }
+  });
+  loadFunctions(context, ['retryConnectionFromGesture']);
+  assert.equal(await context.retryConnectionFromGesture(), true);
+  assert.equal(replay.label, 'resume_last');
+  assert.deepEqual(Array.from(replay.body.uris), ['spotify:track:A']);
+  assert.equal(hereCalls, 0);
+  state.sdkTransferEpoch += 1;
+  assert.equal(context.retryConnectionFromGesture(), false);
+  assert.equal(hereCalls, 1, 'an old transfer failure must not trigger playback in another route epoch');
 });
 
 test('diagnostics v2 keeps correlation fields and drops sensitive input', () => {

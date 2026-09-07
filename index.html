@@ -568,7 +568,7 @@ body{overscroll-behavior-y:none;text-rendering:optimizeLegibility}
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.8.0 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v3.8.1 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -1513,6 +1513,10 @@ Object.assign(state,{
   needsPlaybackResume:false
 });
 const LOCAL_PLAYER_STALE_AFTER_SUSPEND_MS=60*1000;
+function usesIosPlaybackLifecycle(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent||'')||
+    (navigator.platform==='MacIntel'&&Number(navigator.maxTouchPoints)>1);
+}
 
 function noteDiagnostic(category,event,fields){
   if(typeof recordDiagnostic==='function')recordDiagnostic(category,event,fields||{});
@@ -1835,7 +1839,7 @@ function createWebPlayer(){
     // A visible generation is fresh. It still needs an explicit transfer,
     // tracked separately by sdkTransferGeneration; a player that only became
     // ready after iOS hid the app must still be rebuilt on the next gesture.
-    state.sdkDeviceUnconfirmed=!isAppVisible();
+    state.sdkDeviceUnconfirmed=usesIosPlaybackLifecycle()&&!isAppVisible();
     state.sdkTransferGeneration=0;
     state.sdkRouteLeaseEpoch=-1;
     state.sdkPlaybackErrorCount=0;
@@ -2117,8 +2121,24 @@ async function ensureLocalPlaybackRoute(generation,options){
   const allowDirectPlay=!!(options&&options.allowDirectPlay);
   if(generation!==state.sdkGeneration)return false;
   if(!force&&localRouteLeaseIsCurrent(generation))return true;
-  if(state.sdkTransferPromise)return state.sdkTransferPromise;
+  // A transfer-only Here click and a Play click can share registration work,
+  // but only the Play caller may use the direct-play fallback. Retain the
+  // exhausted 404 result for this route epoch so a newer click cannot start
+  // another five-transfer loop before it tries the selected song.
+  if(state.sdkTransferPromise){
+    const waitingEpoch=state.sdkTransferEpoch;
+    const transferred=await state.sdkTransferPromise;
+    if(generation!==state.sdkGeneration||waitingEpoch!==state.sdkTransferEpoch)return false;
+    if(transferred)return true;
+    const failure=state.sdkRouteFailure;
+    return !!(allowDirectPlay&&failure&&failure.status===404&&failure.generation===generation&&failure.epoch===waitingEpoch&&
+      state.sdkReady&&state.sdkActivated&&state.cleanplayDeviceId&&navigator.onLine!==false&&isAppVisible());
+  }
   const routeEpoch=state.sdkTransferEpoch||0;
+  const failedRoute=state.sdkRouteFailure;
+  if(failedRoute&&failedRoute.generation===generation&&failedRoute.epoch===routeEpoch&&failedRoute.status===404){
+    return allowDirectPlay&&state.sdkReady&&state.sdkActivated&&!!state.cleanplayDeviceId&&navigator.onLine!==false&&isAppVisible();
+  }
   let work;
   work=(async function(){
     const activation=state.sdkActivationGeneration===generation?state.sdkActivationPromise:null;
@@ -2141,7 +2161,7 @@ async function ensureLocalPlaybackRoute(generation,options){
     let transferFailure={};
     let transferAttempts=0;
     let transferred=false;
-    setConnectionHealth('recovering','Connecting','Spotify is registering this iPhone for playback.');
+    setConnectionHealth('recovering','Connecting','Spotify is registering this browser for playback.');
     for(let index=0;index<transferDelays.length;index++){
       if(transferDelays[index])await sdkRouteDelay(transferDelays[index]);
       if(!routeIsCurrent())return false;
@@ -2158,16 +2178,16 @@ async function ensureLocalPlaybackRoute(generation,options){
       noteDiagnostic('sdk','sdk_transfer',{status:404,attempt:index+1,reason:'device_missing',target:'here',outcome:'retry'});
     }
     if(!transferred){
-      state.sdkDeviceUnconfirmed=transferFailure.status===404;
+      state.sdkRouteFailure={generation:generation,epoch:routeEpoch,status:transferFailure.status||0};
       state.sdkTransferGeneration=0;
       state.sdkRouteLeaseEpoch=-1;
       noteDiagnostic('sdk','sdk_transfer',{status:transferFailure.status||0,attempt:transferAttempts,reason:sdkTransferFailureReason(transferFailure),target:'here',outcome:'degraded'});
       // A fresh SDK device can accept Start Playback before Spotify's separate
       // transfer endpoint sees it. Let the pending play probe that exact ID;
       // only a successful /play response will confirm this generation.
-      if(allowDirectPlay&&transferFailure.status===404&&routeIsCurrent())return true;
       return false;
     }
+    state.sdkRouteFailure=null;
     state.sdkTransferGeneration=generation;
     state.sdkRouteLeaseEpoch=routeEpoch;
     state.sdkDeviceUnconfirmed=false;
@@ -2182,7 +2202,11 @@ async function ensureLocalPlaybackRoute(generation,options){
     return routeIsCurrent()&&state.sdkTransferGeneration===generation;
   })().finally(function(){if(state.sdkTransferPromise===work)state.sdkTransferPromise=null;});
   state.sdkTransferPromise=work;
-  return work;
+  const transferred=await work;
+  if(transferred)return true;
+  const failure=state.sdkRouteFailure;
+  return !!(allowDirectPlay&&failure&&failure.status===404&&failure.generation===generation&&failure.epoch===routeEpoch&&
+    generation===state.sdkGeneration&&routeEpoch===state.sdkTransferEpoch&&state.sdkReady&&state.sdkActivated&&state.cleanplayDeviceId&&navigator.onLine!==false&&isAppVisible());
 }
 async function reconcileDevices(guard){
   const data=await api('/me/player/devices','GET',null,{silent:true});
@@ -2309,7 +2333,9 @@ function resumeSession(reason,options){
       if(!isCurrentAttempt())return false;
       deviceReady=await reconcileDevices(isCurrentAttempt);
       if(!deviceReady&&isCurrentAttempt()&&state.sdkReady&&state.cleanplayDeviceId){
-        state.sdkDeviceUnconfirmed=true;
+        // Missing discovery rows do not prove a ready SDK player is dead.
+        // Let the next gesture test its route before replacing it. In
+        // particular, backgrounding a desktop tab must not churn device IDs.
         state.sdkTransferGeneration=0;
         state.sdkRouteLeaseEpoch=-1;
         noteDiagnostic('recovery','device_reconcile',{reason:'device_missing',target:'here',outcome:'degraded'});
@@ -2402,7 +2428,7 @@ async function playHere(){
   }
   const routed=await ensureLocalPlaybackRoute(generation);
   if(!routed){
-    setConnectionHealth('recovering','Tap Here again','Spotify found the player but could not route playback to it yet.','Tap Here once more to reconnect this device.');
+    setConnectionHealth('recovering','Choose a song','Spotify has not confirmed this player through transfer. A song selection can try playback directly.','Choose a song or tap Play to start on this device.');
     return false;
   }
   state.activeDeviceId=state.cleanplayDeviceId;
@@ -2420,7 +2446,9 @@ function retryConnectionFromGesture(){
   if(!state.preferredTarget||state.preferredTarget.kind!=='here')return resumeSession('banner',{force:true});
   cancelForegroundResumeForGesture();
   state.lifecycleReason='gesture';
-  if(!state.pendingPlaybackIntent&&state.needsPlaybackResume){
+  const failedTransfer=state.sdkRouteFailure&&state.sdkRouteFailure.status===404&&
+    state.sdkRouteFailure.generation===state.sdkGeneration&&state.sdkRouteFailure.epoch===state.sdkTransferEpoch;
+  if(!state.pendingPlaybackIntent&&(state.needsPlaybackResume||failedTransfer)){
     const recovery=activeQueueRecoveryPlan();
     const body=recovery&&recovery.currentUri?{uris:[recovery.currentUri]}:lastPlayedBody();
     if(body)return playBody('resume_last',body);
@@ -2598,6 +2626,7 @@ async function executePlayerCommand(command,requestFactory,commandId){
       if(localCommand&&isStartPlaybackCommand(command)&&/^\/me\/player\/play(?:\?|$)/.test(request.path)){
         if(commandSdkGeneration!==state.sdkGeneration||commandDeviceId!==state.cleanplayDeviceId)return false;
         state.sdkTransferGeneration=commandSdkGeneration;
+        state.sdkRouteFailure=null;
         state.sdkRouteLeaseEpoch=state.sdkTransferEpoch;
         state.sdkDeviceUnconfirmed=false;
         state.activeDeviceId=commandDeviceId;
@@ -3663,7 +3692,7 @@ function consumeLocalSuspend(){
   state.suspendedAt=0;
   const duration=started?Math.max(0,Date.now()-started):0;
   state.lastSuspendDurationMs=duration;
-  if(duration>=LOCAL_PLAYER_STALE_AFTER_SUSPEND_MS&&state.preferredTarget.kind==='here'&&state.webPlayer&&state.cleanplayDeviceId){
+  if(duration>=LOCAL_PLAYER_STALE_AFTER_SUSPEND_MS&&usesIosPlaybackLifecycle()&&state.preferredTarget.kind==='here'&&state.webPlayer&&state.cleanplayDeviceId){
     // The diagnostics show Spotify can keep listing an SDK device after iOS has
     // silently retired its Connect registration. Preserve it until a genuine
     // gesture, but require that gesture to create and activate a fresh player.
