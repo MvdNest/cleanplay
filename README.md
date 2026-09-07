@@ -38,7 +38,7 @@ The deployed app's setup screen walks through the same process.
 
 Listen Later is stored only in this browser under `cp_saved_v1`. It is intentionally separate from the Spotify library: there is no account sync, and clearing site data or using another browser removes or hides that browser's list.
 
-Diagnostics are stored locally under `cp_diag_v2`. Entries are bounded and redacted: they record operational events, command classes, route generations, latency buckets, and status codes—not access tokens, refresh tokens, authorization codes, device IDs, Spotify URIs, searches, music names, or personal account data. Nothing is uploaded automatically. Use the Settings controls to copy or clear the log when troubleshooting. Lyrics are also opt-in: only opening the Lyrics panel sends the current title, artist, album, and duration to LRCLIB.
+Diagnostics are stored locally under `cp_diag_v2`. Entries are bounded and redacted: they record operational events, command classes, route generations, suspension/latency buckets, browser-versus-standalone mode, playback-progress outcomes, and status codes—not access tokens, refresh tokens, authorization codes, device IDs, Spotify URIs, searches, music names, or personal account data. Nothing is uploaded automatically. Use the Settings controls to copy or clear the log when troubleshooting. Lyrics are also opt-in: only opening the Lyrics panel sends the current title, artist, album, and duration to LRCLIB.
 
 ## Album-art boundary
 

@@ -13,13 +13,41 @@ function countBy(items, key) {
 
 export function analyzeDiagnostics(input) {
   const events = Array.isArray(input?.events) ? input.events.filter(event => event && typeof event === 'object') : [];
+  const ordered = [...events].sort((left, right) => Number(left.ts || 0) - Number(right.ts || 0));
   const failed = events.filter(event => event.outcome === 'failed' || event.outcome === 'degraded');
   const findings = [];
   const has = predicate => events.some(predicate);
   const count = predicate => events.filter(predicate).length;
 
-  if (has(event => event.event === 'command_failed' && event.reason === 'autoplay' && event.audible === 'no')) {
-    findings.push({ code: 'silent_sdk', severity: 'high', summary: 'Spotify accepted playback but the local SDK stayed paused; the saved selection should be retried from a real tap.' });
+  const falseAudible = ordered.some((event, index) => {
+    if (event.event !== 'sdk_playback_error') return false;
+    let commandIndex = -1;
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      const prior = ordered[cursor];
+      if (prior.session !== event.session) continue;
+      if (Number(event.ts) - Number(prior.ts) > 2000) break;
+      if (prior.event === 'command_ok' && prior.audible === 'yes') {
+        commandIndex = cursor;
+        break;
+      }
+    }
+    if (commandIndex < 0) return false;
+    for (let cursor = commandIndex - 1; cursor >= 0; cursor -= 1) {
+      const prior = ordered[cursor];
+      if (prior.session !== event.session) continue;
+      if (Number(event.ts) - Number(prior.ts) > 2000) break;
+      // Each local Start Playback writes sdk_resume immediately before its own
+      // command_ok. Do not let proof from an earlier rapid command mask this one.
+      if (prior.event === 'command_ok' || prior.event === 'command_failed') break;
+      if (prior.event === 'sdk_resume' && prior.progress === 'advanced') return false;
+    }
+    return true;
+  });
+  if (falseAudible) {
+    findings.push({ code: 'false_audible', severity: 'high', summary: 'A command labelled audible was followed almost immediately by an SDK playback error; paused=false was not valid proof of sound.' });
+  }
+  if (has(event => (event.event === 'command_failed' && event.audible === 'no') || event.event === 'sdk_stalled' || event.reason === 'position_stalled')) {
+    findings.push({ code: 'silent_sdk', severity: 'high', summary: 'Spotify accepted playback but the local SDK made no confirmed position progress; retain the selection for a fresh user-activated generation.' });
   }
   if (has(event => event.event === 'sdk_transfer' && event.reason === 'device_missing')) {
     findings.push({ code: 'route_registration', severity: 'high', summary: 'Spotify had not registered the current SDK route when transfer was attempted.' });
@@ -27,10 +55,18 @@ export function analyzeDiagnostics(input) {
   if (has(event => event.event === 'api_error' && event.status === 401)) {
     findings.push({ code: 'authorization', severity: 'high', summary: 'Spotify rejected an access token; inspect the adjacent refresh events.' });
   }
-  const resumesStarted = count(event => event.event === 'resume_start');
-  const resumesCompleted = count(event => event.event === 'resume_ok');
-  if (resumesStarted > resumesCompleted + 1) {
-    findings.push({ code: 'wake_recovery', severity: 'medium', summary: `${resumesStarted - resumesCompleted} foreground recovery attempts did not reach resume_ok.` });
+  const incompleteVisibleResumes = ordered.filter((event, index) => {
+    if (event.event !== 'resume_start') return false;
+    for (let cursor = index + 1; cursor < ordered.length; cursor += 1) {
+      const later = ordered[cursor];
+      if (later.session !== event.session) continue;
+      if (later.event === 'resume_ok') return false;
+      if (later.event === 'hidden' || later.event === 'resume_start') return later.visibility !== 'hidden';
+    }
+    return event.visibility !== 'hidden';
+  }).length;
+  if (incompleteVisibleResumes) {
+    findings.push({ code: 'wake_recovery', severity: 'medium', summary: `${incompleteVisibleResumes} foreground recovery attempt${incompleteVisibleResumes === 1 ? '' : 's'} ended while the app was still visible.` });
   }
   if (has(event => event.event === 'sdk_not_ready')) {
     findings.push({ code: 'sdk_retired', severity: 'medium', summary: 'The SDK explicitly reported not_ready; a new user-activated player generation was required.' });

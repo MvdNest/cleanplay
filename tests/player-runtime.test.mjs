@@ -48,13 +48,20 @@ function loadFunctions(context, names) {
 
 test('a hidden iPhone keeps its player but expires the route lease and stale work', () => {
   let pollingStopped = 0;
+  let recoveryStaged = 0;
   const player = {};
+  const pendingWrite = Promise.resolve(true);
   const state = {
     preferredTarget: { kind: 'here' }, webPlayer: player, cleanplayDeviceId: 'ephemeral',
     sdkTransferEpoch: 4, sdkTransferPromise: Promise.resolve(true), playerCommandSequence: 7,
-    fetchStateSequence: 9
+    playerCommandTail: pendingWrite, fetchStateSequence: 9, suspendedAt: 0
   };
-  const context = contextWith({ state, stopPolling: () => { pollingStopped += 1; } });
+  const context = contextWith({
+    state,
+    isAppVisible: () => false,
+    stageQueueRecoveryIfActive: () => { recoveryStaged += 1; },
+    stopPolling: () => { pollingStopped += 1; }
+  });
   loadFunctions(context, ['preserveLocalPlaybackOnSuspend']);
   assert.equal(context.preserveLocalPlaybackOnSuspend(), false);
   assert.equal(state.webPlayer, player);
@@ -62,7 +69,10 @@ test('a hidden iPhone keeps its player but expires the route lease and stale wor
   assert.equal(state.sdkTransferEpoch, 5);
   assert.equal(state.sdkTransferPromise, null);
   assert.equal(state.playerCommandSequence, 8);
+  assert.equal(state.playerCommandTail, pendingWrite);
   assert.equal(state.fetchStateSequence, 10);
+  assert.ok(state.suspendedAt > 0);
+  assert.equal(recoveryStaged, 1);
   assert.equal(pollingStopped, 1);
 });
 
@@ -78,6 +88,8 @@ test('going offline expires the local route lease and cancels stale recovery wor
     state,
     stopPolling: () => {},
     cancelResumeAttempt: () => { resumeCancelled += 1; },
+    isAppVisible: () => true,
+    stageQueueRecoveryIfActive: () => {},
     noteDiagnostic: () => {},
     setConnectionHealth: (...args) => { health = args; }
   });
@@ -91,6 +103,30 @@ test('going offline expires the local route lease and cancels stale recovery wor
   assert.equal(health[0], 'offline');
 });
 
+test('a meaningful suspension keeps the player until a tap but marks its route unconfirmed', () => {
+  const player = {};
+  const state = {
+    preferredTarget: { kind: 'here' }, webPlayer: player, cleanplayDeviceId: 'ephemeral',
+    suspendedAt: 1000, sdkDeviceUnconfirmed: false, sdkTransferGeneration: 2,
+    sdkRouteLeaseEpoch: 5, lastSuspendDurationMs: 0, isPlaying: true,
+    sdkPlaybackActive: true, needsPlaybackResume: false
+  };
+  const context = contextWith({
+    state,
+    Date: { now: () => 121000 },
+    LOCAL_PLAYER_STALE_AFTER_SUSPEND_MS: 60000
+  });
+  loadFunctions(context, ['consumeLocalSuspend']);
+  assert.equal(context.consumeLocalSuspend(), 120000);
+  assert.equal(state.webPlayer, player);
+  assert.equal(state.cleanplayDeviceId, 'ephemeral');
+  assert.equal(state.sdkDeviceUnconfirmed, true);
+  assert.equal(state.sdkPlaybackActive, false);
+  assert.equal(state.needsPlaybackResume, true);
+  assert.equal(state.sdkTransferGeneration, 0);
+  assert.equal(state.sdkRouteLeaseEpoch, -1);
+});
+
 test('route confirmation is a generation-and-epoch lease', () => {
   const state = {
     sdkGeneration: 3, sdkReady: true, cleanplayDeviceId: 'temporary-device',
@@ -100,32 +136,265 @@ test('route confirmation is a generation-and-epoch lease', () => {
   const context = contextWith({ state });
   loadFunctions(context, ['localRouteLeaseIsCurrent', 'withPlaybackTarget']);
   assert.equal(context.localRouteLeaseIsCurrent(3), true);
-  assert.equal(context.withPlaybackTarget('/me/player/play'), '/me/player/play');
+  assert.equal(context.withPlaybackTarget('/me/player/play'), '/me/player/play?device_id=temporary-device');
   state.sdkTransferEpoch += 1;
   assert.equal(context.localRouteLeaseIsCurrent(3), false);
   assert.equal(context.withPlaybackTarget('/me/player/play'), '/me/player/play?device_id=temporary-device');
 });
 
-test('SDK audibility retries resume and only succeeds on non-paused state', async () => {
+test('SDK audibility requires the expected URI to advance', async () => {
   const diagnostics = [];
   let resumes = 0;
-  const states = [null, { paused: true }, { paused: false }];
+  let consumed = null;
+  const track = uri => ({ current_track: { uri } });
+  const states = [
+    null,
+    { paused: true, position: 0, track_window: track('spotify:track:A') },
+    { paused: false, position: 0, track_window: track('spotify:track:A') },
+    { paused: false, position: 280, track_window: track('spotify:track:A') }
+  ];
   const player = {
     getCurrentState: async () => states.length ? states.shift() : { paused: false },
     resume: async () => { resumes += 1; }
   };
-  const state = { webPlayer: player, sdkGeneration: 2, sdkPlaybackActive: false };
+  const state = { webPlayer: player, sdkGeneration: 2, sdkPlaybackActive: true, sdkProgressCheckSequence: 0 };
   const context = contextWith({
     state,
     sdkRouteDelay: async () => {},
+    markSdkGenerationForRecovery: () => {},
+    consumeQueueLedger: uri => { consumed = uri; },
+    startPolling: () => {},
     noteDiagnostic: (...args) => diagnostics.push(args),
     setConnectionHealth: () => {}
   });
-  loadFunctions(context, ['ensureSdkPlaybackAudible']);
-  assert.equal(await context.ensureSdkPlaybackAudible(2), true);
+  loadFunctions(context, ['sdkCallWithin', 'ensureSdkPlaybackAudible']);
+  assert.equal(await context.ensureSdkPlaybackAudible(2, null, 'spotify:track:A'), true);
   assert.equal(resumes, 1);
+  assert.equal(consumed, 'spotify:track:A');
   assert.equal(diagnostics.at(-1)[1], 'sdk_resume');
   assert.equal(diagnostics.at(-1)[2].outcome, 'ok');
+  assert.equal(diagnostics.at(-1)[2].progress, 'advanced');
+});
+
+test('cached playback flags and paused-false position zero are not audible proof', async () => {
+  let marked = null;
+  const player = {
+    getCurrentState: async () => ({
+      paused: false,
+      position: 0,
+      track_window: { current_track: { uri: 'spotify:track:A' } }
+    }),
+    resume: async () => {}
+  };
+  const state = { webPlayer: player, sdkGeneration: 2, sdkPlaybackActive: true, sdkProgressCheckSequence: 0 };
+  const context = contextWith({
+    state,
+    sdkRouteDelay: async () => {},
+    markSdkGenerationForRecovery: reason => { marked = reason; },
+    consumeQueueLedger: () => {},
+    startPolling: () => {},
+    noteDiagnostic: () => {},
+    setConnectionHealth: () => {}
+  });
+  loadFunctions(context, ['sdkCallWithin', 'ensureSdkPlaybackAudible']);
+  assert.equal(await context.ensureSdkPlaybackAudible(2, null, 'spotify:track:A'), false);
+  assert.equal(marked, 'position_stalled');
+});
+
+test('an old advancing context cannot confirm a new context command', async () => {
+  let position = 0;
+  let marked = null;
+  const player = {
+    getCurrentState: async () => ({
+      paused: false,
+      position: position += 300,
+      context: { uri: 'spotify:album:OLD' },
+      track_window: { current_track: { uri: 'spotify:track:OLD' } }
+    }),
+    resume: async () => {}
+  };
+  const state = { webPlayer: player, sdkGeneration: 2, sdkPlaybackActive: false, sdkProgressCheckSequence: 0 };
+  const context = contextWith({
+    state,
+    sdkRouteDelay: async () => {},
+    markSdkGenerationForRecovery: reason => { marked = reason; },
+    consumeQueueLedger: () => {},
+    startPolling: () => {},
+    noteDiagnostic: () => {},
+    setConnectionHealth: () => {}
+  });
+  loadFunctions(context, ['sdkCallWithin', 'ensureSdkPlaybackAudible']);
+  assert.equal(await context.ensureSdkPlaybackAudible(2, null, null, 'spotify:album:NEW'), false);
+  assert.equal(marked, 'position_stalled');
+});
+
+test('an explicit selection never resumes a null or mismatched old SDK state', async () => {
+  let resumes = 0;
+  const states = [
+    null,
+    { paused: true, position: 8000, track_window: { current_track: { uri: 'spotify:track:OLD' } } },
+    { paused: false, position: 8400, track_window: { current_track: { uri: 'spotify:track:OLD' } } }
+  ];
+  const player = {
+    getCurrentState: async () => states.length ? states.shift() : states.at(-1),
+    resume: async () => { resumes += 1; }
+  };
+  const state = { webPlayer: player, sdkGeneration: 2, sdkPlaybackActive: false, sdkProgressCheckSequence: 0 };
+  const context = contextWith({
+    state,
+    sdkRouteDelay: async () => {},
+    markSdkGenerationForRecovery: () => {},
+    consumeQueueLedger: () => {},
+    startPolling: () => {},
+    noteDiagnostic: () => {},
+    setConnectionHealth: () => {}
+  });
+  loadFunctions(context, ['sdkCallWithin', 'ensureSdkPlaybackAudible']);
+  assert.equal(await context.ensureSdkPlaybackAudible(2, null, 'spotify:track:NEW'), false);
+  assert.equal(resumes, 0);
+});
+
+test('never-settling SDK state and pause calls are bounded during recovery', async () => {
+  let marked = null;
+  let timerId = 0;
+  const never = new Promise(() => {});
+  const player = {
+    getCurrentState: () => never,
+    pause: () => never,
+    resume: () => never
+  };
+  const state = { webPlayer: player, sdkGeneration: 2, sdkPlaybackActive: false, sdkProgressCheckSequence: 0 };
+  const context = contextWith({
+    state,
+    setTimeout: callback => { Promise.resolve().then(callback); return ++timerId; },
+    clearTimeout: () => {},
+    sdkRouteDelay: async () => {},
+    markSdkGenerationForRecovery: reason => { marked = reason; },
+    consumeQueueLedger: () => {},
+    startPolling: () => {},
+    noteDiagnostic: () => {},
+    setConnectionHealth: () => {}
+  });
+  loadFunctions(context, ['sdkCallWithin', 'ensureSdkPlaybackAudible']);
+  assert.equal(await context.ensureSdkPlaybackAudible(2, null, 'spotify:track:A'), false);
+  assert.equal(marked, 'position_stalled');
+});
+
+test('Web API is_playing cannot consume a local queue before SDK progress proof', async () => {
+  let consumed = 0;
+  const state = {
+    fetchStateSequence: 0, currentTrackUri: null, localDuration: 0, localProgress: 0,
+    isPlaying: false, sdkPlaybackActive: false, cleanplayDeviceId: 'local',
+    preferredTarget: { kind: 'here' }, webPlayer: {
+      getCurrentState: async () => ({ paused: false, position: 0 })
+    }, _sleepExpiredPending: false, _lastQueueTrackUri: null, _queueRefreshAt: 0
+  };
+  const context = contextWith({
+    state,
+    api: async () => ({
+      is_playing: true, shuffle_state: false, repeat_state: 'off', progress_ms: 0,
+      device: { id: 'local', name: 'CleanPlay', type: 'Computer', is_restricted: false },
+      item: { id: 'A', uri: 'spotify:track:A', name: 'A', duration_ms: 180000, artists: [] },
+      context: null
+    }),
+    setPreferredTarget: () => {},
+    startPolling: () => {},
+    consumeQueueLedger: () => { consumed += 1; },
+    updateContextLine: async () => true,
+    updateNowPlaying: () => {},
+    updateControls: () => {},
+    updateMediaSession: () => {},
+    refreshUpNext: () => {},
+    localStorage: { setItem: () => {} },
+    noteDiagnostic: () => {},
+    playbackTargetKind: () => 'here'
+  });
+  loadFunctions(context, ['sdkCallWithin', 'fetchState']);
+  assert.equal(await context.fetchState(), true);
+  assert.equal(state.sdkPlaybackActive, false);
+  assert.equal(consumed, 0);
+});
+
+test('a lagging playback poll cannot steal the locally selected SDK target', async () => {
+  const state = {
+    fetchStateSequence: 0, currentTrackUri: null, localDuration: 0, localProgress: 0,
+    isPlaying: false, sdkPlaybackActive: false, cleanplayDeviceId: 'fresh-local',
+    activeDeviceId: 'fresh-local', activeDeviceName: 'CleanPlay - this device',
+    activeDeviceType: 'Computer', preferredTarget: { kind: 'here' }, webPlayer: null,
+    _sleepExpiredPending: false, _lastQueueTrackUri: null, _queueRefreshAt: 0
+  };
+  const context = contextWith({
+    state,
+    api: async () => ({
+      is_playing: true, shuffle_state: false, repeat_state: 'off', progress_ms: 4000,
+      device: { id: 'lagging-remote', name: 'Old device', type: 'Computer', is_restricted: false },
+      item: { id: 'A', uri: 'spotify:track:A', name: 'A', duration_ms: 180000, artists: [] },
+      context: null
+    }),
+    setPreferredTarget: () => {},
+    startPolling: () => {},
+    consumeQueueLedger: () => {},
+    updateContextLine: async () => true,
+    updateNowPlaying: () => {},
+    updateControls: () => {},
+    updateMediaSession: () => {},
+    refreshUpNext: () => {},
+    localStorage: { setItem: () => {} },
+    noteDiagnostic: () => {},
+    playbackTargetKind: () => 'here'
+  });
+  loadFunctions(context, ['sdkCallWithin', 'fetchState']);
+  assert.equal(await context.fetchState(), true);
+  assert.equal(state.activeDeviceId, 'fresh-local');
+  assert.equal(state.activeDeviceName, 'CleanPlay - this device');
+  assert.equal(state.currentTrackUri, null);
+  assert.equal(state.isPlaying, false);
+});
+
+test('the first play tap after an unconfirmed local wake resumes instead of pausing', async () => {
+  let command = null;
+  const state = {
+    preferredTarget: { kind: 'here' }, isPlaying: true, sdkPlaybackActive: false,
+    needsSdkRecovery: false, sdkDeviceUnconfirmed: true, needsPlaybackResume: true,
+    currentTrackUri: 'spotify:track:A', activeDeviceId: 'local', cleanplayDeviceId: 'local'
+  };
+  const context = contextWith({
+    state,
+    activeQueueRecoveryPlan: () => null,
+    lastPlayedBody: () => null,
+    playerCommand: async label => { command = label; return true; },
+    preparePlaybackIntent: () => false,
+    startPolling: () => {},
+    updateControls: () => {},
+    navigator: {}
+  });
+  loadFunctions(context, ['togglePlay']);
+  assert.equal(await context.togglePlay(), true);
+  assert.equal(command, 'play');
+});
+
+test('healthy local next and previous keep Spotify skip semantics', async () => {
+  const commands = [];
+  const state = {
+    preferredTarget: { kind: 'here' }, isPlaying: true, sdkPlaybackActive: true,
+    needsSdkRecovery: false, sdkDeviceUnconfirmed: false, needsPlaybackResume: false,
+    localProgress: 0
+  };
+  const context = contextWith({
+    state,
+    playerCommand: async label => { commands.push(label); return true; },
+    preparePlaybackIntent: () => false,
+    stageQueueRecoveryIfActive: () => { throw new Error('healthy playback must not stage recovery'); },
+    activeQueueRecoveryPlan: () => ({ currentUri: 'spotify:track:A', uris: ['spotify:track:B'] }),
+    playBody: async () => { throw new Error('healthy skip must not replace context'); },
+    setConnectionHealth: () => {},
+    setTimeout: () => 1,
+    fetchState: () => {}
+  });
+  loadFunctions(context, ['localRecoveryControlPlan', 'nextTrack', 'prevTrack']);
+  assert.equal(await context.nextTrack(), true);
+  assert.equal(await context.prevTrack(), true);
+  assert.deepEqual(commands, ['next', 'previous']);
 });
 
 test('an accepted Web API play remains failed when the SDK is silent', async () => {
@@ -149,12 +418,12 @@ test('an accepted Web API play remains failed when the SDK is silent', async () 
     invalidateSdkDevice: () => {},
     recoverPlaybackTarget: async () => false
   });
-  loadFunctions(context, ['executePlayerCommand']);
+  loadFunctions(context, ['expectedPlaybackUri', 'expectedPlaybackContext', 'executePlayerCommand']);
   const result = await context.executePlayerCommand('play_track', () => ({ path: '/me/player/play', method: 'PUT' }), 1);
   assert.equal(result, false);
   assert.equal(diagnostics.some(([, event]) => event === 'command_ok'), false);
   assert.equal(diagnostics.at(-1)[1], 'command_failed');
-  assert.equal(diagnostics.at(-1)[2].reason, 'autoplay');
+  assert.equal(diagnostics.at(-1)[2].reason, 'position_stalled');
 });
 
 test('failed audible playback retains the latest pending selection', async () => {
@@ -173,6 +442,129 @@ test('failed audible playback retains the latest pending selection', async () =>
   assert.equal(await context.runPendingPlaybackIntent(4), false);
   assert.equal(state.pendingPlaybackIntent, pending);
   assert.equal(pending.running, false);
+});
+
+test('a fresh connecting replacement is reused by an impatient second tap', () => {
+  let rebuilds = 0;
+  let activations = 0;
+  const state = {
+    preferredTarget: { kind: 'here' }, activeDeviceId: null, cleanplayDeviceId: null,
+    webPlayer: {}, needsSdkRecovery: false, sdkDeviceUnconfirmed: false,
+    sdkGeneration: 8, sdkReady: false, playbackIntentSequence: 0
+  };
+  const context = contextWith({
+    state,
+    window: { Spotify: { Player: function Player() {} } },
+    cancelForegroundResumeForGesture: () => {},
+    queuePendingPlaybackIntent: (label, run) => {
+      state.pendingPlaybackIntent = { id: ++state.playbackIntentSequence, label, run };
+    },
+    rebuildWebPlayerForGesture: () => { rebuilds += 1; return {}; },
+    activateSdkAudio: () => { activations += 1; return Promise.resolve(true); },
+    runPendingPlaybackIntent: () => Promise.resolve(false),
+    initWebPlayer: () => {},
+    noteDiagnostic: () => {},
+    setConnectionHealth: () => {},
+    setPreferredTarget: () => {}
+  });
+  loadFunctions(context, ['preparePlaybackIntent']);
+  assert.equal(context.preparePlaybackIntent('play_track', async () => true), true);
+  assert.equal(context.preparePlaybackIntent('play_track', async () => true), true);
+  assert.equal(rebuilds, 0);
+  assert.equal(activations, 2);
+  assert.equal(state.pendingPlaybackIntent.id, 2);
+});
+
+test('an initialization error immediately marks a fresh generation replaceable', async () => {
+  const listeners = {};
+  let readyResolved = null;
+  const player = {
+    addListener: (event, handler) => { listeners[event] = handler; },
+    connect: async () => true,
+    pause: async () => {},
+    disconnect: () => {}
+  };
+  const Player = function Player() { return player; };
+  const state = {
+    accessToken: 'present', sdkGeneration: 3, needsSdkRecovery: true,
+    sdkTransferEpoch: 0, sdkProgressCheckSequence: 0,
+    preferredTarget: { kind: 'here' }, currentTrackUri: null
+  };
+  const context = contextWith({
+    state,
+    Spotify: { Player },
+    window: { Spotify: { Player } },
+    makeSdkReadyPromise: generation => { state.sdkReadyGeneration = generation; },
+    ensureToken: async () => true,
+    stageQueueRecoveryIfActive: () => {},
+    resolveSdkReady: value => { readyResolved = value; },
+    noteDiagnostic: () => {},
+    setConnectionHealth: () => {}
+  });
+  loadFunctions(context, ['markSdkGenerationForRecovery', 'createWebPlayer']);
+  assert.equal(context.createWebPlayer(), player);
+  assert.equal(state.needsSdkRecovery, false);
+  listeners.initialization_error();
+  assert.equal(state.needsSdkRecovery, true);
+  assert.equal(state.sdkDeviceUnconfirmed, true);
+  assert.equal(readyResolved, false);
+  await Promise.resolve();
+});
+
+test('a never-settling audio activation is bounded and marks the generation replaceable', async () => {
+  let timerId = 0;
+  const never = new Promise(() => {});
+  const player = { activateElement: () => never };
+  const state = {
+    webPlayer: player, sdkGeneration: 7, sdkActivated: false,
+    sdkTransferEpoch: 2, sdkPlaybackErrorCount: 0
+  };
+  const context = contextWith({
+    state,
+    setTimeout: callback => { Promise.resolve().then(callback); return ++timerId; },
+    clearTimeout: () => {},
+    noteDiagnostic: () => {},
+    setConnectionHealth: () => {},
+    runPendingPlaybackIntent: () => {}
+  });
+  loadFunctions(context, ['sdkCallWithin', 'activateSdkAudio']);
+  assert.equal(await context.activateSdkAudio(), false);
+  assert.equal(state.needsSdkRecovery, true);
+  assert.equal(state.sdkDeviceUnconfirmed, true);
+  assert.equal(state.sdkActivationPromise, null);
+  assert.equal(state.sdkTransferEpoch, 3);
+});
+
+test('a new start command cancels delayed progress proof from the old track', async () => {
+  let timer = null;
+  let consumed = 0;
+  const player = {
+    getCurrentState: async () => ({
+      paused: false, position: 2000,
+      track_window: { current_track: { uri: 'spotify:track:A' } }
+    })
+  };
+  const state = {
+    webPlayer: player, sdkGeneration: 4, sdkProgressCheckSequence: 0,
+    playerCommandSequence: 0, playerCommandTail: null
+  };
+  const context = contextWith({
+    state,
+    setTimeout: callback => { timer = callback; return 1; },
+    consumeQueueLedger: () => { consumed += 1; },
+    startPolling: () => {},
+    executePlayerCommand: async () => true
+  });
+  loadFunctions(context, [
+    'scheduleSdkProgressConfirmation', 'isStartPlaybackCommand',
+    'commandSupersedesPlayback', 'playerCommand'
+  ]);
+  context.scheduleSdkProgressConfirmation(player, 4, 'spotify:track:A', 1000);
+  assert.equal(state.sdkProgressCheckSequence, 0);
+  await context.playerCommand('play_track', () => ({}));
+  assert.equal(state.sdkProgressCheckSequence, 1);
+  await timer();
+  assert.equal(consumed, 0);
 });
 
 test('rapid queued commands coalesce to the newest command before execution', async () => {
@@ -229,14 +621,130 @@ test('a selected song preserves the explicit remaining queue in order', () => {
   assert.deepEqual(Array.from(body.uris), ['spotify:track:A', 'spotify:track:B', 'spotify:track:C']);
 });
 
-test('post-unlock transfer 404 falls back to one targeted play on the same tap', async () => {
+test('a staged recovery plan never duplicates its current track', () => {
+  const state = { currentTrackUri: 'spotify:track:B', localProgress: 12000, queueRecoveryPlan: null };
+  let persisted = null;
+  const context = contextWith({
+    state,
+    knownRemainingQueue: () => ['spotify:track:B', 'spotify:track:C'],
+    writeQueueLedger: uris => { persisted = [...uris]; }
+  });
+  loadFunctions(context, ['stageQueueRecovery']);
+  const plan = context.stageQueueRecovery();
+  assert.equal(plan.currentUri, 'spotify:track:B');
+  assert.deepEqual(Array.from(plan.uris), ['spotify:track:C']);
+  assert.equal(plan.positionMs, 12000);
+  assert.deepEqual(persisted, ['spotify:track:C']);
+});
+
+test('staging a current-only ledger clears it instead of replaying the song twice', () => {
+  const state = { currentTrackUri: 'spotify:track:A', localProgress: 1000, queueRecoveryPlan: {} };
+  let persisted = null;
+  const context = contextWith({
+    state,
+    knownRemainingQueue: () => ['spotify:track:A'],
+    writeQueueLedger: uris => { persisted = [...uris]; }
+  });
+  loadFunctions(context, ['stageQueueRecovery']);
+  assert.equal(context.stageQueueRecovery(), null);
+  assert.deepEqual(persisted, []);
+  assert.equal(state.queueRecoveryPlan, null);
+});
+
+test('recovery stages the SDK-proven naturally advanced track before polling catches up', () => {
+  const state = {
+    currentTrackUri: 'spotify:track:A', localProgress: 178000,
+    sdkPlaybackActive: true, _lastSdkPlayingUri: 'spotify:track:B',
+    _lastSdkPlayingPosition: 4200, queueRecoveryPlan: null
+  };
+  const context = contextWith({
+    state,
+    knownRemainingQueue: () => ['spotify:track:C'],
+    writeQueueLedger: () => {}
+  });
+  loadFunctions(context, ['stageQueueRecovery']);
+  const plan = context.stageQueueRecovery();
+  assert.equal(plan.currentUri, 'spotify:track:B');
+  assert.equal(plan.positionMs, 4200);
+  assert.deepEqual(Array.from(plan.uris), ['spotify:track:C']);
+});
+
+test('recovery uses current polled position once polling matches the proven track', () => {
+  const state = {
+    currentTrackUri: 'spotify:track:B', localProgress: 56000,
+    sdkPlaybackActive: true, _lastSdkPlayingUri: 'spotify:track:B',
+    _lastSdkPlayingPosition: 4200, queueRecoveryPlan: null
+  };
+  const context = contextWith({
+    state,
+    knownRemainingQueue: () => ['spotify:track:C'],
+    writeQueueLedger: () => {}
+  });
+  loadFunctions(context, ['stageQueueRecovery']);
+  assert.equal(context.stageQueueRecovery().positionMs, 56000);
+});
+
+test('post-unlock transfer 404 waits through one bounded registration window then targets play', async () => {
   const requests = [];
+  const routeDelays = [];
   const state = {
     playerCommandSequence: 1, activeDeviceId: 'fresh-device', cleanplayDeviceId: 'fresh-device',
     sdkGeneration: 6, sdkReady: true, sdkActivated: true, webPlayer: {},
     sdkActivationGeneration: 6, sdkActivationPromise: Promise.resolve(true),
     sdkTransferGeneration: 6, sdkTransferEpoch: 12, sdkRouteLeaseEpoch: 11,
     sdkDeviceUnconfirmed: false, sdkTransferPromise: null, accessToken: 'present'
+  };
+  const context = contextWith({
+    state,
+    navigator: { onLine: true },
+    isAppVisible: () => true,
+    sdkRouteDelay: async delay => { routeDelays.push(delay); },
+    noteDiagnostic: () => {},
+    setConnectionHealth: () => {},
+    playbackTargetKind: () => 'here',
+    reconcileDevices: async () => true,
+    ensureSdkPlaybackAudible: async () => true,
+    stageQueueRecoveryIfActive: () => {},
+    invalidateSdkDevice: () => {},
+    recoverPlaybackTarget: async () => false,
+    api: async (path, method, body, options) => {
+      requests.push({ path, method, body });
+      if (path === '/me/player' && body?.device_ids) {
+        state.activeDeviceId = 'lagging-remote-device';
+        options.failureSink.status = 404;
+        options.failureSink.reason = 'device_missing';
+        return null;
+      }
+      return {};
+    }
+  });
+  loadFunctions(context, [
+    'sdkTransferFailureReason', 'localRouteLeaseIsCurrent', 'ensureLocalPlaybackRoute',
+    'withPlaybackTarget', 'isStartPlaybackCommand', 'expectedPlaybackUri', 'expectedPlaybackContext', 'executePlayerCommand'
+  ]);
+  const result = await context.executePlayerCommand(
+    'play_track',
+    () => ({ path: context.withPlaybackTarget('/me/player/play'), method: 'PUT', body: { uris: ['spotify:track:A'] } }),
+    1
+  );
+  assert.equal(result, true);
+  assert.equal(requests.length, 6);
+  assert.equal(requests.filter(request => request.path === '/me/player').length, 5);
+  assert.deepEqual(routeDelays, [500, 1000, 1800, 2800]);
+  assert.equal(requests.at(-1).path, '/me/player/play?device_id=fresh-device');
+  assert.equal(state.sdkRouteLeaseEpoch, state.sdkTransferEpoch);
+  assert.equal(state.sdkDeviceUnconfirmed, false);
+});
+
+test('a local play 404 does not repeat the exhausted transfer/play chain', async () => {
+  const requests = [];
+  let invalidations = 0;
+  const state = {
+    playerCommandSequence: 1, activeDeviceId: 'stale-device', cleanplayDeviceId: 'stale-device',
+    sdkGeneration: 6, sdkReady: true, sdkActivated: true, webPlayer: {},
+    sdkActivationGeneration: 6, sdkActivationPromise: Promise.resolve(true),
+    sdkTransferGeneration: 0, sdkTransferEpoch: 12, sdkRouteLeaseEpoch: -1,
+    sdkDeviceUnconfirmed: true, sdkTransferPromise: null, accessToken: 'present'
   };
   const context = contextWith({
     state,
@@ -249,33 +757,29 @@ test('post-unlock transfer 404 falls back to one targeted play on the same tap',
     reconcileDevices: async () => true,
     ensureSdkPlaybackAudible: async () => true,
     stageQueueRecoveryIfActive: () => {},
-    invalidateSdkDevice: () => {},
+    invalidateSdkDevice: () => { invalidations += 1; },
     recoverPlaybackTarget: async () => false,
     api: async (path, method, body, options) => {
       requests.push({ path, method, body });
-      if (path === '/me/player' && body?.device_ids) {
-        options.failureSink.status = 404;
-        options.failureSink.reason = 'device_missing';
-        return null;
-      }
-      return {};
+      options.failureSink.status = 404;
+      options.failureSink.reason = 'device_missing';
+      return null;
     }
   });
   loadFunctions(context, [
     'sdkTransferFailureReason', 'localRouteLeaseIsCurrent', 'ensureLocalPlaybackRoute',
-    'withPlaybackTarget', 'isStartPlaybackCommand', 'executePlayerCommand'
+    'withPlaybackTarget', 'isStartPlaybackCommand', 'expectedPlaybackUri', 'expectedPlaybackContext', 'executePlayerCommand'
   ]);
   const result = await context.executePlayerCommand(
     'play_track',
     () => ({ path: context.withPlaybackTarget('/me/player/play'), method: 'PUT', body: { uris: ['spotify:track:A'] } }),
     1
   );
-  assert.equal(result, true);
-  assert.equal(requests.length, 2);
-  assert.equal(requests[0].path, '/me/player');
-  assert.equal(requests[1].path, '/me/player/play?device_id=fresh-device');
-  assert.equal(state.sdkRouteLeaseEpoch, state.sdkTransferEpoch);
-  assert.equal(state.sdkDeviceUnconfirmed, false);
+  assert.equal(result, false);
+  assert.equal(requests.length, 6);
+  assert.equal(requests.filter(request => request.path === '/me/player').length, 5);
+  assert.equal(requests.filter(request => request.path.includes('/me/player/play')).length, 1);
+  assert.equal(invalidations, 1);
 });
 
 test('concurrent token refresh callers share one request', async () => {
@@ -379,6 +883,7 @@ test('the Retry banner reactivates and replays a retained local selection', asyn
   const context = contextWith({
     state,
     window: { Spotify: { Player: function Player() {} } },
+    cancelForegroundResumeForGesture: () => {},
     activateSdkAudio: () => { activations += 1; return Promise.resolve(true); },
     runPendingPlaybackIntent: async generation => { pendingRuns += 1; return generation === 3; },
     rebuildWebPlayerForGesture: () => {},
@@ -392,6 +897,27 @@ test('the Retry banner reactivates and replays a retained local selection', asyn
   assert.equal(activations, 1);
   assert.equal(pendingRuns, 1);
   assert.equal(state.activeDeviceId, 'ephemeral');
+});
+
+test('the Retry banner resumes staged playback when no pending intent exists', async () => {
+  let replay = null;
+  const state = {
+    preferredTarget: { kind: 'here' }, pendingPlaybackIntent: null,
+    needsPlaybackResume: true
+  };
+  const context = contextWith({
+    state,
+    cancelForegroundResumeForGesture: () => {},
+    activeQueueRecoveryPlan: () => null,
+    lastPlayedBody: () => ({ uris: ['spotify:track:A'] }),
+    playBody: async (label, body) => { replay = { label, body }; return true; },
+    resumeSession: () => false,
+    playHere: () => false
+  });
+  loadFunctions(context, ['retryConnectionFromGesture']);
+  assert.equal(await context.retryConnectionFromGesture(), true);
+  assert.equal(replay.label, 'resume_last');
+  assert.deepEqual(Array.from(replay.body.uris), ['spotify:track:A']);
 });
 
 test('diagnostics v2 keeps correlation fields and drops sensitive input', () => {
@@ -409,13 +935,18 @@ test('diagnostics v2 keeps correlation fields and drops sensitive input', () => 
     ts: Date.now(), session: '070707070707', seq: 12, category: 'playback', event: 'command_ok',
     status: 204, attempt: 1, reason: 'gesture', target: 'here', outcome: 'ok',
     command: 'play_track', sdkGeneration: 5, resumeGeneration: 2, routeEpoch: 8,
-    durationMs: 640, audible: true,
+    durationMs: 640, audible: true, progress: 'advanced', surface: 'standalone',
     token: 'must-not-survive', deviceId: 'must-not-survive', uri: 'must-not-survive', name: 'must-not-survive'
   });
   assert.equal(entry.duration, 'lt1s');
   assert.equal(entry.audible, 'yes');
+  assert.equal(entry.progress, 'advanced');
+  assert.equal(entry.surface, 'standalone');
   assert.equal(entry.command, 'play_track');
   assert.equal(entry.sdkGeneration, 5);
+  assert.equal(context.sanitizeDiagnosticEntry({
+    ts: Date.now(), category: 'lifecycle', event: 'visible', duration: 'gte10s'
+  }).duration, 'gte10s');
   const serialized = JSON.stringify(entry);
   assert.doesNotMatch(serialized, /must-not-survive|token|deviceId|uri|name/);
 });

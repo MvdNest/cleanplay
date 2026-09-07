@@ -25,3 +25,55 @@ test('diagnostic analyzer handles an empty export safely', () => {
   assert.equal(report.eventCount, 0);
   assert.equal(report.findings[0].code, 'empty');
 });
+
+test('diagnostic analyzer catches a false audible result followed by playback error', () => {
+  const now = Date.now();
+  const report = analyzeDiagnostics({
+    version: 2,
+    events: [
+      { ts: now, session: 'bbbbbbbbbbbb', event: 'sdk_resume', audible: 'yes', outcome: 'ok' },
+      { ts: now + 5, session: 'bbbbbbbbbbbb', event: 'command_ok', command: 'play_track', audible: 'yes', outcome: 'ok' },
+      { ts: now + 49, session: 'bbbbbbbbbbbb', event: 'sdk_playback_error', reason: 'unknown', outcome: 'failed' }
+    ]
+  });
+  assert.ok(report.findings.some(finding => finding.code === 'false_audible'));
+});
+
+test('diagnostic analyzer does not call proven progress a false audible result', () => {
+  const now = Date.now();
+  const report = analyzeDiagnostics({
+    version: 2,
+    events: [
+      { ts: now, session: 'dddddddddddd', event: 'sdk_resume', audible: 'yes', progress: 'advanced', outcome: 'ok' },
+      { ts: now + 5, session: 'dddddddddddd', event: 'command_ok', command: 'play_track', audible: 'yes', outcome: 'ok' },
+      { ts: now + 49, session: 'dddddddddddd', event: 'sdk_playback_error', reason: 'unknown', outcome: 'failed' }
+    ]
+  });
+  assert.equal(report.findings.some(finding => finding.code === 'false_audible'), false);
+});
+
+test('progress proof for one command cannot mask a later false audible command', () => {
+  const now = Date.now();
+  const report = analyzeDiagnostics({
+    version: 2,
+    events: [
+      { ts: now, session: 'eeeeeeeeeeee', event: 'sdk_resume', audible: 'yes', progress: 'advanced', outcome: 'ok' },
+      { ts: now + 5, session: 'eeeeeeeeeeee', event: 'command_ok', command: 'play_track', audible: 'yes', outcome: 'ok' },
+      { ts: now + 20, session: 'eeeeeeeeeeee', event: 'command_ok', command: 'play_track', audible: 'yes', outcome: 'ok' },
+      { ts: now + 49, session: 'eeeeeeeeeeee', event: 'sdk_playback_error', reason: 'unknown', outcome: 'failed' }
+    ]
+  });
+  assert.ok(report.findings.some(finding => finding.code === 'false_audible'));
+});
+
+test('a resume interrupted by another hide is not reported as a wake failure', () => {
+  const now = Date.now();
+  const report = analyzeDiagnostics({
+    version: 2,
+    events: [
+      { ts: now, session: 'cccccccccccc', event: 'resume_start', visibility: 'visible', outcome: 'retry' },
+      { ts: now + 10, session: 'cccccccccccc', event: 'hidden', visibility: 'hidden', outcome: 'degraded' }
+    ]
+  });
+  assert.equal(report.findings.some(finding => finding.code === 'wake_recovery'), false);
+});
