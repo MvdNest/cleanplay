@@ -321,3 +321,40 @@ test('idle playback clears metadata and hides the mini-player immediately on ano
   assert.equal(element('mini-player').hidden, true);
   assert.equal(navigator.mediaSession.metadata, null);
 });
+
+test('main and mini controls agree with local readiness without hiding a healthy transition Pause', () => {
+  const elements = new Map();
+  function element(id) {
+    if (!elements.has(id)) elements.set(id, {
+      hidden: false, style: {}, attributes: {}, innerHTML: '',
+      classList: { toggle() {}, contains: () => true },
+      setAttribute(name, value) { this.attributes[name] = value; }
+    });
+    return elements.get(id);
+  }
+  const state = {
+    activeView: 'search', preferredTarget: { kind: 'here' }, isPlaying: true,
+    currentTrack: { name: 'Old track', artists: [] }, currentTrackUri: 'spotify:track:A',
+    webPlayer: null, cleanplayDeviceId: null, sdkPlaybackActive: false, repeatState: 'off'
+  };
+  const context = runtime(['localPlaybackNeedsStart', 'playbackControlIsPlaying', 'updateControls', 'updateMiniPlayer'], {
+    state, document: { getElementById: element }
+  });
+  context.updateControls();
+  assert.equal(element('btn-play').attributes['aria-label'], 'Play');
+  assert.equal(element('mini-play').attributes['aria-label'], 'Play');
+  assert.equal(element('np-eq').style.display, 'none');
+  assert.equal(element('play-icon').innerHTML, element('mini-play-icon').innerHTML);
+
+  state.webPlayer = {}; state.cleanplayDeviceId = 'current-local';
+  context.updateControls();
+  assert.equal(state.sdkPlaybackActive, false, 'natural transitions need not have position proof yet');
+  assert.equal(element('btn-play').attributes['aria-label'], 'Pause');
+  assert.equal(element('mini-play').attributes['aria-label'], 'Pause');
+  assert.equal(element('np-eq').style.display, 'inline-flex');
+
+  state.needsSdkRecovery = true;
+  context.updateControls();
+  assert.equal(element('btn-play').attributes['aria-label'], 'Play');
+  assert.equal(element('mini-play').attributes['aria-label'], 'Play');
+});

@@ -251,7 +251,7 @@
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v4.0.0 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v4.0.1 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -300,7 +300,7 @@ window.onSpotifyWebPlaybackSDKReady = function(){
 <script id="cleanplay-spotify-sdk" data-cleanplay-sdk="true" src="https://sdk.scdn.co/spotify-player.js" defer></script>
 <script>
 'use strict';
-const APP_VERSION = '4.0.0';
+const APP_VERSION = '4.0.1';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 // Spotify's Web Playback SDK requires user-read-email together with streaming and
 // user-read-private. CleanPlay requests that compatibility scope but never accesses,
@@ -587,14 +587,28 @@ function showIdle(){
   if('mediaSession' in navigator){ navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }
 }
 
+function localPlaybackNeedsStart(){
+  return !!(state.preferredTarget&&state.preferredTarget.kind==='here'&&(
+    !state.webPlayer||!state.cleanplayDeviceId||state.needsSdkRecovery||state.sdkDeviceUnconfirmed||state.needsPlaybackResume
+  ));
+}
+function playbackControlIsPlaying(){
+  // A cold page can receive the previous browser/device's still-playing Web
+  // API metadata before this page has an SDK player. Keep the metadata useful,
+  // but offer Play here rather than a Pause that has no local device to stop.
+  // Lack of position proof alone is not a failure: healthy transitions must
+  // retain their Pause action while Spotify advances naturally.
+  return !!state.isPlaying&&!localPlaybackNeedsStart();
+}
 function updateControls(){
-  document.getElementById('play-icon').innerHTML = state.isPlaying ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+  const playing=playbackControlIsPlaying();
+  document.getElementById('play-icon').innerHTML = playing ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
   document.getElementById('btn-shuffle').classList.toggle('active', state.shuffleState);
   document.getElementById('btn-repeat').classList.toggle('active', state.repeatState!=='off');
   const eq = document.getElementById('np-eq');
-  if(eq) eq.style.display = state.isPlaying ? 'inline-flex' : 'none';
+  if(eq) eq.style.display = playing ? 'inline-flex' : 'none';
   const playButton=document.getElementById('btn-play');
-  if(playButton){playButton.setAttribute('aria-label',state.isPlaying?'Pause':'Play');playButton.title=state.isPlaying?'Pause':'Play';}
+  if(playButton){playButton.setAttribute('aria-label',playing?'Pause':'Play');playButton.title=playing?'Pause':'Play';}
   document.getElementById('btn-shuffle').setAttribute('aria-pressed',String(!!state.shuffleState));
   document.getElementById('btn-repeat').setAttribute('aria-label','Repeat: '+state.repeatState);
   document.getElementById('btn-repeat').setAttribute('aria-pressed',String(state.repeatState!=='off'));
@@ -957,8 +971,9 @@ function updateMiniPlayer(){
   if(player.hidden)return;
   document.getElementById('mini-title').textContent=state.currentTrack.name||'Now playing';
   document.getElementById('mini-artist').textContent=(state.currentTrack.artists||[]).map(function(a){return a.name;}).join(', ')||state.currentTrack.show?.name||'';
-  document.getElementById('mini-play').setAttribute('aria-label',state.isPlaying?'Pause':'Play');
-  document.getElementById('mini-play-icon').innerHTML=state.isPlaying?'<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>':'<path d="M8 5v14l11-7z"/>';
+  const playing=playbackControlIsPlaying();
+  document.getElementById('mini-play').setAttribute('aria-label',playing?'Pause':'Play');
+  document.getElementById('mini-play-icon').innerHTML=playing?'<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>':'<path d="M8 5v14l11-7z"/>';
 }
 function handleSeekKey(event){
   if(!state.localDuration)return;
@@ -1696,7 +1711,7 @@ function createWebPlayer(){
     state.sdkTransferGeneration=0;
     state.sdkRouteLeaseEpoch=-1;
     noteDiagnostic('sdk','sdk_activation',{reason:'autoplay',target:'here',outcome:'degraded'});
-    setConnectionHealth('recovering','Tap play again','The browser blocked autoplay after the player changed.','Tap play once more to enable audio on this device.');
+    setConnectionHealth('recovering','Tap play again','The browser blocked automatic playback. Tap Play to re-enable audio. If this repeats on desktop, check this site\'s autoplay permission.','Tap play once more to enable audio on this device.');
   });
   player.addListener('playback_error',function(payload){
     if(!isCurrentPlayer())return;
@@ -2153,7 +2168,7 @@ function resumeSession(reason,options){
       return false;
     }
     noteDiagnostic('lifecycle','resume_ok',{reason:reason,target:state.preferredTarget.kind,outcome:'ok'});
-    if(state.preferredTarget.kind==='here'&&(!state.webPlayer||state.needsSdkRecovery||state.sdkDeviceUnconfirmed))setConnectionHealth('recovering','Tap play','Your account is connected. A fresh tap will safely wake audio on this iPhone.','Tap play to reconnect this device.');
+    if(state.preferredTarget.kind==='here'&&(!state.webPlayer||state.needsSdkRecovery||state.sdkDeviceUnconfirmed))setConnectionHealth('recovering','Tap play','Your account is connected. A fresh tap will safely wake audio on this device.','Tap play to reconnect this device.');
     else if(deviceReady||state.currentTrackUri)setConnectionHealth('online','Connected','Spotify account and playback state are current.');
     else setConnectionHealth('online','Spotify connected','Start Spotify on a device, then choose it in CleanPlay.');
     return true;
@@ -2267,7 +2282,7 @@ function retryConnectionFromGesture(){
     state.activeDeviceName='CleanPlay - this device';
     state.activeDeviceType='Computer';
   }
-  setConnectionHealth('recovering','Retrying selection','Re-activating this iPhone and retrying the saved selection.','Your selection is still saved. Keep CleanPlay open while it reconnects.');
+  setConnectionHealth('recovering','Retrying selection','Re-activating this device and retrying the saved selection.','Your selection is still saved. Keep CleanPlay open while it reconnects.');
   return Promise.resolve(activation).then(function(activated){
     if(!activated||generation!==state.sdkGeneration)return false;
     return runPendingPlaybackIntent(generation);
@@ -2364,14 +2379,14 @@ async function ensureSdkPlaybackAudible(generation,guard,expectedUri,expectedCon
   await sdkCallWithin(function(){return player.pause();},800,false);
   if(!isCurrent()||player!==state.webPlayer||generation!==state.sdkGeneration)return false;
   noteDiagnostic('sdk','sdk_resume',{reason:'position_stalled',target:'here',outcome:'degraded',audible:false,progress:'stalled'});
-  setConnectionHealth('recovering','Tap play again','Spotify accepted the selection but this iPhone produced no playback progress. Your selection is still saved.','Tap play once more to create a fresh audio session.');
+  setConnectionHealth('recovering','Tap play again','Spotify accepted the selection but this device produced no playback progress. Your selection is still saved.','Tap play once more to create a fresh audio session.');
   return false;
 }
 
 function playerCommand(command,requestFactory){
-  if(command==='pause'||command==='sleep_pause'){
-    // A stop owns playback intent, including starts still waiting for SDK
-    // readiness. Late callbacks must not restart audio after the stop.
+  if(command==='pause'||command==='sleep_pause'||command==='next'||command==='previous'){
+    // Explicit transport controls supersede starts still waiting for SDK
+    // readiness. Late callbacks must not restart an older selection afterward.
     state.pendingPlaybackIntent=null;
     state.playbackCommandEpoch=(state.playbackCommandEpoch||0)+1;
     state.sdkProgressCheckSequence=(state.sdkProgressCheckSequence||0)+1;
@@ -2394,9 +2409,11 @@ async function executePlayerCommand(command,requestFactory,commandId){
   const isCurrentCommand=function(){return commandId===state.playerCommandSequence;};
   const commandStartedAt=Date.now();
   const isPauseCommand=command==='pause'||command==='sleep_pause';
-  if(isPauseCommand&&state.preferredTarget&&state.preferredTarget.kind==='here'&&!state.cleanplayDeviceId){
+  const isStartCommand=isStartPlaybackCommand(command);
+  if(command!=='transfer'&&!isStartCommand&&state.preferredTarget&&state.preferredTarget.kind==='here'&&!state.cleanplayDeviceId){
     noteDiagnostic('playback','command_failed',{command:command,reason:'device_missing',target:'here',outcome:'failed'});
-    setConnectionHealth('recovering','Player unavailable','There is no current local player to pause. Other devices were left untouched.');
+    if(isPauseCommand)setConnectionHealth('recovering','Player unavailable','There is no current local player to pause. Other devices were left untouched.');
+    else setConnectionHealth('recovering','Tap play first','There is no current local player for this control. Other devices were left untouched.','Tap Play to prepare this device before using that control.');
     return false;
   }
   const preferredLocal=command!=='transfer'&&state.preferredTarget&&state.preferredTarget.kind==='here'&&!!state.cleanplayDeviceId;
@@ -2416,9 +2433,11 @@ async function executePlayerCommand(command,requestFactory,commandId){
   }
   const initialGeneration=state.sdkGeneration;
   const initialLocal=command!=='transfer'&&state.cleanplayDeviceId&&(preferredLocal||state.activeDeviceId===state.cleanplayDeviceId);
-  // Pausing must never activate audio, register a replacement player, or
-  // transfer playback away from another device. Send only the targeted stop.
-  if(initialLocal&&!isPauseCommand&&!await ensureLocalPlaybackRoute(initialGeneration,{allowDirectPlay:isStartPlaybackCommand(command)})){
+  // Only an actual Start Playback needs the transfer handshake. A seek,
+  // skip, queue, volume, or other existing-session control must not transfer
+  // with play:false after backgrounding: that silently pauses healthy audio.
+  // Send it to this exact SDK ID and let an authoritative failure fail closed.
+  if(initialLocal&&isStartCommand&&!await ensureLocalPlaybackRoute(initialGeneration,{allowDirectPlay:true})){
     if(!isCurrentCommand())return false;
     noteDiagnostic('playback','command_failed',{command:command,reason:'device_missing',target:'here',outcome:'failed',durationMs:Date.now()-commandStartedAt});
     setConnectionHealth('recovering','Tap play again','Spotify has not finished routing playback to this browser. Your request is still saved.','Tap play again to reconnect and retry.');
@@ -2442,9 +2461,9 @@ async function executePlayerCommand(command,requestFactory,commandId){
     const request=requestFactory(),failure={};
     const result=await api(request.path,request.method||'PUT',request.body===undefined?null:request.body,{silent:true,failureSink:failure});
     if(!isCurrentCommand())return false;
+    if(localCommand&&(commandSdkGeneration!==state.sdkGeneration||commandDeviceId!==state.cleanplayDeviceId))return false;
     if(result!==null){
       if(localCommand&&isStartPlaybackCommand(command)&&/^\/me\/player\/play(?:\?|$)/.test(request.path)){
-        if(commandSdkGeneration!==state.sdkGeneration||commandDeviceId!==state.cleanplayDeviceId)return false;
         state.sdkTransferGeneration=commandSdkGeneration;
         state.sdkRouteFailure=null;
         state.sdkRouteLeaseEpoch=state.sdkTransferEpoch;
@@ -2465,14 +2484,13 @@ async function executePlayerCommand(command,requestFactory,commandId){
     }
     const missingDevice=failure.status===404&&(failure.reason==='device_missing'||localCommand);
     if(missingDevice&&localCommand){
-      // The route preflight has already exhausted bounded registration retries
-      // for this exact generation. Repeating transfer/play writes now only
-      // churns a dead ID and can restart a track. Preserve the intent and let
-      // the next physical tap synchronously activate one fresh generation.
+      // This exact local ID failed authoritatively. Never turn an ordinary
+      // control into transfer/start retries that could restart or skip audio.
+      // Preserve the queue and let the next Play tap activate a fresh player.
       stageQueueRecoveryIfActive();
       invalidateSdkDevice('device_missing',commandDeviceId);
       noteDiagnostic('playback','command_failed',{command:command,status:404,attempt:attempt,target:'here',outcome:'failed',durationMs:Date.now()-commandStartedAt});
-      setConnectionHealth('recovering','Tap play again','Spotify could not reach this browser player after an explicit transfer. Your remaining queue was kept.','Tap play again to register a fresh player.');
+      setConnectionHealth('recovering','Tap play again','Spotify could not reach the selected browser player. Your remaining queue was kept.','Tap play again to register a fresh player.');
       return false;
     }
     if(attempt===0&&missingDevice){
@@ -2523,7 +2541,7 @@ function preparePlaybackIntent(label,run){
     if(activated&&generation===state.sdkGeneration)runPendingPlaybackIntent(generation);
   });
   noteDiagnostic('recovery','command_retry',{reason:'gesture',target:'here',outcome:'retry'});
-  setConnectionHealth('recovering','Waking player','Activating audio, registering this iPhone, and routing your saved selection.','Reconnecting this device and starting your selection...');
+  setConnectionHealth('recovering','Waking player','Activating audio, registering this device, and routing your saved selection.','Reconnecting this device and starting your selection...');
   return true;
 }
 async function playBody(label,body){
@@ -2571,11 +2589,9 @@ function lastPlayedBody(){
 }
 async function togglePlay(forcePlaying){
   const recovery=activeQueueRecoveryPlan();
-  const localNeedsAudiblePlayback=state.preferredTarget.kind==='here'&&(
-    state.needsSdkRecovery||state.sdkDeviceUnconfirmed||state.needsPlaybackResume
-  );
-  const nextPlaying=typeof forcePlaying==='boolean'?forcePlaying:localNeedsAudiblePlayback||!state.isPlaying;
-  if(nextPlaying&&(recovery&&localNeedsAudiblePlayback||state.needsSdkRecovery&&state.preferredTarget.kind==='here')){
+  const localNeedsAudiblePlayback=localPlaybackNeedsStart();
+  const nextPlaying=typeof forcePlaying==='boolean'?forcePlaying:!playbackControlIsPlaying();
+  if(nextPlaying&&(recovery&&localNeedsAudiblePlayback||state.preferredTarget.kind==='here'&&(!state.webPlayer||!state.cleanplayDeviceId||state.needsSdkRecovery))){
     const recoveryBody=recovery&&recovery.currentUri?{uris:[recovery.currentUri]}:lastPlayedBody();
     if(recoveryBody)return playBody('resume_last',recoveryBody);
   }
@@ -2615,13 +2631,20 @@ async function nextTrack(){
     return false;
   }
   const run=async function(){const ok=await playerCommand('next',function(){return {path:withPlaybackTarget('/me/player/next'),method:'POST'};});if(ok)setTimeout(fetchState,450);return ok;};
-  if(preparePlaybackIntent('next',run))return false;
+  if(state.preferredTarget.kind==='here')cancelForegroundResumeForGesture();
   return run();
 }
 async function seekTo(positionMs){
-  const target=Math.max(0,Math.min(state.localDuration||positionMs,Math.floor(positionMs))),previous=state.localProgress;
-  const ok=await playerCommand('seek',function(){return {path:withPlaybackTarget('/me/player/seek?position_ms='+target),method:'PUT'};});
-  if(ok)state.localProgress=target;else state.localProgress=previous;
+  const target=Math.max(0,Math.min(state.localDuration||positionMs,Math.floor(positionMs)));
+  const generation=state.sdkGeneration,uri=state.currentTrackUri;
+  const request=playerCommand('seek',function(){return {path:withPlaybackTarget('/me/player/seek?position_ms='+target),method:'PUT'};});
+  const commandSequence=state.playerCommandSequence;
+  const ok=await request;
+  // A new selection/player owns its position even when this old seek fails.
+  // No optimistic position was written, so failure must not roll fresh SDK
+  // progress back to the sample captured before the network request.
+  if(generation!==state.sdkGeneration||uri!==state.currentTrackUri||commandSequence!==state.playerCommandSequence)return false;
+  if(ok)state.localProgress=target;
   updateProgress();return ok;
 }
 async function prevTrack(){
@@ -2633,7 +2656,7 @@ async function prevTrack(){
   }
   if(state.localProgress>3000)return seekTo(0);
   const run=async function(){const ok=await playerCommand('previous',function(){return {path:withPlaybackTarget('/me/player/previous'),method:'POST'};});if(ok)setTimeout(fetchState,450);return ok;};
-  if(preparePlaybackIntent('previous',run))return false;
+  if(state.preferredTarget.kind==='here')cancelForegroundResumeForGesture();
   return run();
 }
 async function toggleShuffle(){
@@ -2651,10 +2674,19 @@ async function toggleRepeat(){
 function setVolume(value){
   if(state.supportsVolume===false)return;
   const desired=Math.max(0,Math.min(100,parseInt(value)||0));
+  const sequence=setVolume._sequence=(setVolume._sequence||0)+1;
+  const generation=state.sdkGeneration,targetKind=state.preferredTarget&&state.preferredTarget.kind;
+  const deviceId=targetKind==='here'?state.cleanplayDeviceId:state.activeDeviceId;
+  const ownsVolume=function(){return sequence===setVolume._sequence&&generation===state.sdkGeneration&&
+    targetKind===(state.preferredTarget&&state.preferredTarget.kind)&&deviceId===(targetKind==='here'?state.cleanplayDeviceId:state.activeDeviceId);};
   clearTimeout(setVolume._t);
   setVolume._t=setTimeout(async function(){
+    if(!ownsVolume())return;
     const old=state.confirmedVolume??80;
     const ok=await playerCommand('volume',function(){return {path:withPlaybackTarget('/me/player/volume?volume_percent='+desired),method:'PUT'};});
+    // A stale response must not roll back a newer slider input or paint the
+    // previous device's volume onto a replacement playback session.
+    if(!ownsVolume())return;
     const slider=document.getElementById('volume-slider'),pct=document.getElementById('vol-pct');
     if(ok){state.confirmedVolume=desired;if(pct)pct.textContent=desired;}
     else{if(slider)slider.value=old;if(pct)pct.textContent=old;}

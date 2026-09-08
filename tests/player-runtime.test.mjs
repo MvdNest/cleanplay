@@ -43,7 +43,9 @@ function contextWith(values = {}) {
 }
 
 function loadFunctions(context, names) {
-  new vm.Script(names.map(extractFunction).join('\n')).runInContext(context);
+  const dependencies = names.includes('togglePlay') ? ['localPlaybackNeedsStart', 'playbackControlIsPlaying'] : [];
+  if(names.includes('executePlayerCommand'))dependencies.push('isStartPlaybackCommand');
+  new vm.Script([...new Set([...dependencies, ...names])].map(extractFunction).join('\n')).runInContext(context);
 }
 
 test('a hidden iPhone keeps its player but expires the route lease and stale work', () => {
@@ -492,7 +494,7 @@ test('the displayed Pause control pauses during a natural track transition', asy
   const state = {
     preferredTarget: { kind: 'here' }, isPlaying: true, sdkPlaybackActive: false,
     needsSdkRecovery: false, sdkDeviceUnconfirmed: false, needsPlaybackResume: false,
-    currentTrackUri: 'spotify:track:B', activeDeviceId: 'local', cleanplayDeviceId: 'local'
+    currentTrackUri: 'spotify:track:B', activeDeviceId: 'local', cleanplayDeviceId: 'local', webPlayer: {}
   };
   const context = contextWith({
     state, navigator: {}, activeQueueRecoveryPlan: () => null,
@@ -519,6 +521,59 @@ test('pause with no current local device leaves a different Spotify device untou
   assert.equal(await context.executePlayerCommand('pause', () => ({}), 1), false);
 });
 
+test('a cold local page starts its remembered selection instead of pausing an old reported device', async () => {
+  let replay = null;
+  const state = {
+    preferredTarget: { kind: 'here' }, isPlaying: true, sdkPlaybackActive: false,
+    webPlayer: null, cleanplayDeviceId: null, sdkGeneration: 0,
+    needsSdkRecovery: false, sdkDeviceUnconfirmed: false, needsPlaybackResume: false,
+    currentTrackUri: 'spotify:track:A', activeDeviceId: 'previous-session'
+  };
+  const context = contextWith({
+    state, activeQueueRecoveryPlan: () => null,
+    lastPlayedBody: () => ({ uris: ['spotify:track:A'] }),
+    playBody: async (label, body) => { replay = { label, body }; return true; },
+    playerCommand: () => { throw new Error('an absent local player cannot pause the old device'); }
+  });
+  loadFunctions(context, ['togglePlay']);
+  assert.equal(context.playbackControlIsPlaying(), false);
+  assert.equal(await context.togglePlay(), true);
+  assert.equal(replay.label, 'resume_last');
+  assert.deepEqual(Array.from(replay.body.uris), ['spotify:track:A']);
+});
+
+test('a cold local page without remembered metadata prepares a normal start', async () => {
+  let prepared = null;
+  const state = {
+    preferredTarget: { kind: 'here' }, isPlaying: true, webPlayer: null,
+    cleanplayDeviceId: null, currentTrackUri: 'spotify:track:A'
+  };
+  const context = contextWith({
+    state, activeQueueRecoveryPlan: () => null, lastPlayedBody: () => null,
+    preparePlaybackIntent: label => { prepared = label; return true; }
+  });
+  loadFunctions(context, ['togglePlay']);
+  assert.equal(await context.togglePlay(), false);
+  assert.equal(prepared, 'play');
+});
+
+test('remote playback still pauses without any local SDK player', async () => {
+  let command = null;
+  const state = {
+    preferredTarget: { kind: 'remote' }, isPlaying: true, webPlayer: null,
+    cleanplayDeviceId: null, activeDeviceId: 'remote', currentTrackUri: 'spotify:track:A'
+  };
+  const context = contextWith({
+    state, navigator: {}, activeQueueRecoveryPlan: () => null,
+    playerCommand: async label => { command = label; return true; }, updateControls() {},
+    preparePlaybackIntent: () => { throw new Error('remote pause must not prepare a local player'); }
+  });
+  loadFunctions(context, ['togglePlay']);
+  assert.equal(context.playbackControlIsPlaying(), true);
+  assert.equal(await context.togglePlay(), true);
+  assert.equal(command, 'pause');
+});
+
 test('a sleep pause supersedes a pending play and clears its deferred intent', async () => {
   const commands = [];
   const state = {
@@ -540,7 +595,7 @@ test('resuming a healthy paused player ignores its obsolete pre-lock queue snaps
   const state = {
     preferredTarget: { kind: 'here' }, isPlaying: false, sdkPlaybackActive: false,
     needsSdkRecovery: false, sdkDeviceUnconfirmed: false, needsPlaybackResume: false,
-    currentTrackUri: 'spotify:track:B', activeDeviceId: 'local', cleanplayDeviceId: 'local'
+    currentTrackUri: 'spotify:track:B', activeDeviceId: 'local', cleanplayDeviceId: 'local', webPlayer: {}
   };
   const context = contextWith({
     state, navigator: {}, activeQueueRecoveryPlan: () => ({ currentUri: 'spotify:track:A', uris: ['spotify:track:B'] }),
@@ -556,6 +611,7 @@ test('resuming a healthy paused player ignores its obsolete pre-lock queue snaps
 
 test('healthy local next and previous keep Spotify skip semantics', async () => {
   const commands = [];
+  let foregroundCancellations = 0;
   const state = {
     preferredTarget: { kind: 'here' }, isPlaying: true, sdkPlaybackActive: true,
     needsSdkRecovery: false, sdkDeviceUnconfirmed: false, needsPlaybackResume: false,
@@ -564,7 +620,8 @@ test('healthy local next and previous keep Spotify skip semantics', async () => 
   const context = contextWith({
     state,
     playerCommand: async label => { commands.push(label); return true; },
-    preparePlaybackIntent: () => false,
+    preparePlaybackIntent: () => { throw new Error('healthy skip must not register or activate a player'); },
+    cancelForegroundResumeForGesture: () => { foregroundCancellations += 1; },
     stageQueueRecoveryIfActive: () => { throw new Error('healthy playback must not stage recovery'); },
     activeQueueRecoveryPlan: () => ({ currentUri: 'spotify:track:A', uris: ['spotify:track:B'] }),
     playBody: async () => { throw new Error('healthy skip must not replace context'); },
@@ -576,6 +633,121 @@ test('healthy local next and previous keep Spotify skip semantics', async () => 
   assert.equal(await context.nextTrack(), true);
   assert.equal(await context.prevTrack(), true);
   assert.deepEqual(commands, ['next', 'previous']);
+  assert.equal(foregroundCancellations, 2, 'direct transport gestures still supersede stale foreground reads');
+});
+
+test('seeking after backgrounding never transfers or pauses a healthy local player', async () => {
+  const requests = [];
+  const state = {
+    preferredTarget: { kind: 'here' }, isPlaying: true, sdkPlaybackActive: true,
+    webPlayer: {}, cleanplayDeviceId: 'local', activeDeviceId: 'local', sdkGeneration: 2,
+    sdkReady: true, sdkActivated: true, sdkTransferGeneration: 2, sdkTransferEpoch: 8,
+    sdkRouteLeaseEpoch: 8, playerCommandSequence: 0, localProgress: 12000, localDuration: 120000
+  };
+  const context = contextWith({
+    state, isAppVisible: () => false, stageQueueRecoveryIfActive() {}, stopPolling() {},
+    updateProgress() {}, noteDiagnostic() {}, setConnectionHealth() {},
+    ensureLocalPlaybackRoute: () => { throw new Error('seeking must not transfer with play:false'); },
+    api: async (path, method, body) => { requests.push({ path, method, body }); return {}; }
+  });
+  loadFunctions(context, ['preserveLocalPlaybackOnSuspend', 'seekTo', 'playerCommand', 'executePlayerCommand',
+    'isStartPlaybackCommand', 'commandSupersedesPlayback', 'withPlaybackTarget', 'playbackTargetKind']);
+  context.preserveLocalPlaybackOnSuspend();
+  assert.notEqual(state.sdkRouteLeaseEpoch, state.sdkTransferEpoch);
+  assert.equal(await context.seekTo(45000), true);
+  assert.deepEqual(requests, [{ path: '/me/player/seek?position_ms=45000&device_id=local', method: 'PUT', body: null }]);
+  assert.equal(state.localProgress, 45000);
+  assert.equal(state.isPlaying, true);
+  assert.equal(state.sdkPlaybackActive, true);
+});
+
+test('existing-session controls use only their exact local endpoint after a route lease expires', async () => {
+  const controls = [
+    ['next', '/me/player/next', 'POST'], ['previous', '/me/player/previous', 'POST'],
+    ['queue', '/me/player/queue?uri=spotify%3Atrack%3AB', 'POST'],
+    ['volume', '/me/player/volume?volume_percent=45', 'PUT'],
+    ['shuffle', '/me/player/shuffle?state=true', 'PUT'], ['repeat', '/me/player/repeat?state=context', 'PUT']
+  ];
+  for(const [command, path, method] of controls) {
+    const requests = [];
+    const state = {
+      preferredTarget: { kind: 'here' }, webPlayer: {}, cleanplayDeviceId: 'local', activeDeviceId: 'lagging-remote',
+      sdkGeneration: 2, sdkTransferGeneration: 2, sdkRouteLeaseEpoch: 1, sdkTransferEpoch: 2,
+      playerCommandSequence: 4, isPlaying: true
+    };
+    const context = contextWith({
+      state, noteDiagnostic() {}, setConnectionHealth() {},
+      ensureLocalPlaybackRoute: () => { throw new Error(`${command} must not transfer playback`); },
+      api: async (requestPath, requestMethod) => { requests.push([requestPath, requestMethod]); return {}; }
+    });
+    loadFunctions(context, ['executePlayerCommand', 'withPlaybackTarget', 'playbackTargetKind']);
+    assert.equal(await context.executePlayerCommand(command, () => ({ path: context.withPlaybackTarget(path), method }), 4), true);
+    assert.deepEqual(requests, [[`${path}${path.includes('?') ? '&' : '?'}device_id=local`, method]]);
+    assert.equal(state.isPlaying, true);
+    assert.equal(state.sdkRouteLeaseEpoch, 1, 'an ordinary control must not falsely confirm the full start handshake');
+  }
+});
+
+test('local controls with no current SDK ID never fall back to an old remote target', async () => {
+  for(const command of ['seek', 'next', 'previous', 'queue', 'volume', 'shuffle', 'repeat', 'pause', 'sleep_pause']) {
+    const state = {
+      preferredTarget: { kind: 'here' }, cleanplayDeviceId: null, activeDeviceId: 'unrelated-remote',
+      playerCommandSequence: 1
+    };
+    const context = contextWith({
+      state, noteDiagnostic() {}, setConnectionHealth() {},
+      reconcileDevices: () => { throw new Error(`${command} cannot choose a different target`); },
+      api: () => { throw new Error(`${command} cannot change the unrelated device`); }
+    });
+    loadFunctions(context, ['executePlayerCommand']);
+    assert.equal(await context.executePlayerCommand(command, () => ({}), 1), false);
+  }
+});
+
+test('an existing-session local 404 fails once without replay, transfer, or remote reconciliation', async () => {
+  const requests = []; let invalidations = 0;
+  const state = {
+    preferredTarget: { kind: 'here' }, cleanplayDeviceId: 'stale-local', activeDeviceId: 'stale-local',
+    sdkGeneration: 3, playerCommandSequence: 1, accessToken: 'present'
+  };
+  const context = contextWith({
+    state, noteDiagnostic() {}, setConnectionHealth() {}, stageQueueRecoveryIfActive() {},
+    invalidateSdkDevice: () => { invalidations += 1; },
+    ensureLocalPlaybackRoute: () => { throw new Error('seek must not transfer'); },
+    recoverPlaybackTarget: () => { throw new Error('a local 404 cannot silently replay the control'); },
+    api: async (path, method, body, options) => {
+      requests.push(path); Object.assign(options.failureSink, { status: 404, reason: 'device_missing' }); return null;
+    }
+  });
+  loadFunctions(context, ['executePlayerCommand', 'withPlaybackTarget']);
+  assert.equal(await context.executePlayerCommand('seek', () => ({ path: context.withPlaybackTarget('/me/player/seek?position_ms=10000'), method: 'PUT' }), 1), false);
+  assert.deepEqual(requests, ['/me/player/seek?position_ms=10000&device_id=stale-local']);
+  assert.equal(invalidations, 1);
+});
+
+test('a late local control response cannot act on a newer SDK generation', async () => {
+  const state = {
+    preferredTarget: { kind: 'here' }, cleanplayDeviceId: 'old-local', activeDeviceId: 'old-local',
+    sdkGeneration: 3, playerCommandSequence: 1
+  };
+  const context = contextWith({
+    state, noteDiagnostic() {}, setConnectionHealth() {},
+    api: async () => { state.sdkGeneration = 4; state.cleanplayDeviceId = 'new-local'; return {}; }
+  });
+  loadFunctions(context, ['executePlayerCommand', 'withPlaybackTarget']);
+  assert.equal(await context.executePlayerCommand('volume', () => ({ path: context.withPlaybackTarget('/me/player/volume?volume_percent=45'), method: 'PUT' }), 1), false);
+});
+
+test('next and previous cancel older pending starts without preparing a new playback intent', async () => {
+  for(const command of ['next', 'previous']) {
+    const state = { pendingPlaybackIntent: { label: 'play_track' }, playerCommandSequence: 0, playbackCommandEpoch: 5, sdkProgressCheckSequence: 2 };
+    const context = contextWith({ state, executePlayerCommand: async () => true });
+    loadFunctions(context, ['playerCommand', 'commandSupersedesPlayback', 'isStartPlaybackCommand']);
+    assert.equal(await context.playerCommand(command, () => ({})), true);
+    assert.equal(state.pendingPlaybackIntent, null);
+    assert.equal(state.playbackCommandEpoch, 6);
+    assert.equal(state.sdkProgressCheckSequence, 3);
+  }
 });
 
 test('an accepted Web API play remains failed when the SDK is silent', async () => {
@@ -1262,6 +1434,103 @@ test('Retry after a transfer-only 404 plays the retained selection without requi
   state.sdkTransferEpoch += 1;
   assert.equal(context.retryConnectionFromGesture(), false);
   assert.equal(hereCalls, 1, 'an old transfer failure must not trigger playback in another route epoch');
+});
+
+test('late seek completions never overwrite a newer player, track, or transport selection', async () => {
+  for(const result of [true, false]) {
+    for(const changedField of ['sdkGeneration', 'currentTrackUri', 'playerCommandSequence']) {
+      let resolveRequest, renders = 0;
+      const state = {
+        sdkGeneration: 3, currentTrackUri: 'spotify:track:A', playerCommandSequence: 6,
+        localProgress: 20000, localDuration: 120000
+      };
+      const context = contextWith({
+        state, updateProgress: () => { renders += 1; },
+        playerCommand: () => new Promise(resolve => { resolveRequest = resolve; })
+      });
+      loadFunctions(context, ['seekTo']);
+      const pending = context.seekTo(80000);
+      state[changedField] = changedField === 'currentTrackUri' ? 'spotify:track:B' : state[changedField] + 1;
+      state.localProgress = 1500;
+      resolveRequest(result);
+      assert.equal(await pending, false);
+      assert.equal(state.localProgress, 1500, `${changedField} must retain the newer position after ${result}`);
+      assert.equal(renders, 0);
+    }
+  }
+});
+
+test('a failed seek retains progress received from the same live player while awaiting Spotify', async () => {
+  let resolveRequest;
+  const state = { sdkGeneration: 2, currentTrackUri: 'spotify:track:A', playerCommandSequence: 4, localProgress: 20000, localDuration: 120000 };
+  const context = contextWith({
+    state, updateProgress() {}, playerCommand: () => new Promise(resolve => { resolveRequest = resolve; })
+  });
+  loadFunctions(context, ['seekTo']);
+  const pending = context.seekTo(80000);
+  state.localProgress = 24000;
+  resolveRequest(false);
+  assert.equal(await pending, false);
+  assert.equal(state.localProgress, 24000);
+});
+
+test('late volume responses cannot repaint a different SDK generation or playback target', async () => {
+  for(const result of [true, false]) {
+    for(const changedField of ['sdkGeneration', 'cleanplayDeviceId']) {
+      let timer, resolveRequest;
+      const slider = { value: 30 }, pct = { textContent: '30' };
+      const state = { preferredTarget: { kind: 'here' }, sdkGeneration: 3, cleanplayDeviceId: 'local', confirmedVolume: 30 };
+      const context = contextWith({
+        state, setTimeout: callback => { timer = callback; return 1; }, clearTimeout() {},
+        document: { getElementById: id => id === 'volume-slider' ? slider : pct },
+        playerCommand: () => new Promise(resolve => { resolveRequest = resolve; })
+      });
+      loadFunctions(context, ['setVolume']);
+      context.setVolume(80);
+      const pending = timer();
+      state[changedField] = changedField === 'sdkGeneration' ? 4 : 'new-local';
+      state.confirmedVolume = 45; slider.value = 45; pct.textContent = '45';
+      resolveRequest(result);
+      await pending;
+      assert.equal(state.confirmedVolume, 45);
+      assert.equal(slider.value, 45);
+      assert.equal(pct.textContent, '45');
+    }
+  }
+});
+
+test('newer volume input owns the UI while a previous request is still awaiting Spotify', async () => {
+  let timer, resolveRequest;
+  const slider = { value: 30 }, pct = { textContent: '30' };
+  const state = { preferredTarget: { kind: 'remote' }, activeDeviceId: 'speaker', sdkGeneration: 0, confirmedVolume: 30 };
+  const context = contextWith({
+    state, setTimeout: callback => { timer = callback; return 1; }, clearTimeout() {},
+    document: { getElementById: id => id === 'volume-slider' ? slider : pct },
+    playerCommand: () => new Promise(resolve => { resolveRequest = resolve; })
+  });
+  loadFunctions(context, ['setVolume']);
+  context.setVolume(80);
+  const previous = timer();
+  context.setVolume(45); slider.value = 45;
+  resolveRequest(false);
+  await previous;
+  assert.equal(slider.value, 45, 'failed older request cannot roll back the newer input');
+  const latest = timer(); resolveRequest(true); await latest;
+  assert.equal(state.confirmedVolume, 45);
+  assert.equal(pct.textContent, 45);
+});
+
+test('a volume input whose target changed during debounce sends no command to the replacement', async () => {
+  let timer;
+  const state = { preferredTarget: { kind: 'remote' }, activeDeviceId: 'old-speaker', sdkGeneration: 0 };
+  const context = contextWith({
+    state, setTimeout: callback => { timer = callback; return 1; }, clearTimeout() {},
+    playerCommand: () => { throw new Error('old volume input cannot target the replacement speaker'); }
+  });
+  loadFunctions(context, ['setVolume']);
+  context.setVolume(80);
+  state.activeDeviceId = 'new-speaker';
+  await timer();
 });
 
 test('diagnostics v2 keeps correlation fields and drops sensitive input', () => {

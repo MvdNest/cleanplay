@@ -15,6 +15,7 @@ CleanPlay is a private, text-only Spotify controller designed for iPhone and des
 - Safari shortcut guidance, plus an optional standalone PWA and an offline app shell
 - Wake/reconnect handling for expired access tokens and short-lived Spotify SDK device IDs
 - Preserve healthy players through backgrounding; replace a player only when playback/device evidence requires it
+- Existing-player controls do not transfer or pause audio behind the scenes; cold local sessions show Play until this browser has a player
 - Local, redacted diagnostics that can be copied for troubleshooting
 
 CleanPlay does not download music and cannot play while offline. The service worker caches only the app shell.

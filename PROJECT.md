@@ -128,6 +128,8 @@ v4.0 recovery follows these rules:
 12. Restart ordinary polling after recovery settles. Polling is read-only: a null/204 state, null `player_state_changed` payload, or paused-at-zero transition is never permission to synthesize `/next` or `/play`.
 13. Pause and sleep-timer pause cancel pending start intent and send only the targeted stop. They must not activate audio, construct a new local player, or transfer playback. If the selected local player has no ID, fail safely without stopping an unrelated remote device.
 14. Once advancing SDK position proves that the same player continued, clear its old pre-lock recovery snapshot. A later resume must not rewind to the snapshot's previous song or replay its stale remaining queue.
+15. Existing-session controls (seek, next/previous, queue, volume, shuffle, repeat, pause) send only their exact targeted request. An expired route lease alone must not trigger a transfer with `play:false`: the September 8 live Edge test confirmed that doing so silently paused healthy audio when seeking after a background return. No current local ID means fail safely, never fall back to a remembered remote target. Only Start Playback or an explicit device transfer runs the registration/transfer handshake. Skip commands supersede older pending starts; stale generation responses cannot invalidate a newer player.
+16. A fresh page can receive still-playing metadata from its previous Spotify session before creating a local SDK player. Keep that metadata available, but main and mini controls must both show/dispatch Play, not a Pause against a missing device. Share the effective transport-state decision; retain Pause during healthy natural track transitions.
 
 Keep recovery idempotent and visible in diagnostics. iOS still requires `player.activateElement()` during a real tap before in-browser audio starts; automated wake logic cannot manufacture that gesture.
 
@@ -254,6 +256,7 @@ The document root owns vertical page scrolling. Keep horizontal clipping and ove
 | `404`, `NO_ACTIVE_DEVICE`, or device not found | A fresh SDK ID is still propagating, or the old device vanished | CleanPlay retries the same local ID once; if it still fails, tap playback again to activate a replacement. For remote playback, choose a live device |
 | Sign-in required after about six months | Fixed refresh-token lifetime reached | Complete PKCE authorization again |
 | Play here is silent on iPhone | User gesture missing or SDK was genuinely retired | Tap a playback action once to activate the browser player |
+| `sdk_activation` with reason `autoplay` at a track boundary | The SDK reports browser autoplay blocking; this does not prove the player was replaced or the token expired | Tap Play; if repeated on desktop, inspect the site's media-autoplay permission. Do not silently change global browser permissions or promise this fixes iOS suspension |
 | Next song waits until iPhone unlock, but works in ordinary Safari | Observed standalone/background limitation, not necessarily auth/device loss | Use Safari; on iOS 26 add a browser shortcut with Open as Web App off. Export/import Listen Later before retiring the old icon |
 | Shell opens but controls fail offline | Only static shell is cached | Reconnect |
 | Old UI after deploy | Previous service-worker shell remains | Close/reopen or hard-refresh; verify cache version bump |
