@@ -251,7 +251,7 @@
             <div class="settings-info"><div class="settings-label">Lyrics privacy</div><div class="settings-detail">Lyrics are opt-in. Opening Lyrics sends the current title, artist, album, and duration to LRCLIB; nothing is sent while Lyrics stays closed.</div></div>
           </div>
           <div class="settings-row">
-            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v4.0.1 - text only - no album art, ever</div></div>
+            <div class="settings-info"><div class="settings-label">About</div><div class="settings-detail">CleanPlay - v4.0.2 - text only - no album art, ever</div></div>
           </div>
         </div>
       </section>
@@ -300,7 +300,7 @@ window.onSpotifyWebPlaybackSDKReady = function(){
 <script id="cleanplay-spotify-sdk" data-cleanplay-sdk="true" src="https://sdk.scdn.co/spotify-player.js" defer></script>
 <script>
 'use strict';
-const APP_VERSION = '4.0.1';
+const APP_VERSION = '4.0.2';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 // Spotify's Web Playback SDK requires user-read-email together with streaming and
 // user-read-private. CleanPlay requests that compatibility scope but never accesses,
@@ -1575,7 +1575,13 @@ function queueAwarePlaybackBody(body,label){
   // A killed PWA can reopen with no in-memory recovery plan while the durable
   // ledger still contains the songs that followed lastPlayed. Only an explicit
   // Resume inherits that sequence; choosing a new song always replaces it.
-  const remaining=plan?plan.uris:readQueueLedger();
+  let remaining=plan?plan.uris:readQueueLedger();
+  // The durable ledger is written before playback is proven. If autoplay was
+  // blocked before that proof, its first URI still represents this same item,
+  // not another queued copy. Normalize only that leading fallback entry;
+  // preserve later repeats and the already-staged in-memory remaining plan.
+  const resumeUri=copy.uris&&copy.uris.length===1?copy.uris[0]:copy.context_uri&&copy.offset&&copy.offset.uri;
+  if(!plan&&resumeUri&&remaining[0]===resumeUri)remaining=remaining.slice(1);
   if(!remaining.length)return copy;
   if(copy.uris&&copy.uris.length===1)copy.uris=copy.uris.concat(remaining);
   else if(copy.context_uri&&copy.offset&&cleanQueueUris([copy.offset.uri]).length){

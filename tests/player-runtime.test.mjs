@@ -1032,6 +1032,60 @@ test('a selected song preserves the explicit remaining queue in order', () => {
   assert.deepEqual(Array.from(body.uris), ['spotify:track:A', 'spotify:track:B', 'spotify:track:C']);
 });
 
+test('cold resume removes only the leading current item from an unconsumed durable ledger', () => {
+  for(const ledger of [
+    ['spotify:track:A', 'spotify:track:B', 'spotify:track:C'],
+    ['spotify:track:A', 'spotify:track:A', 'spotify:track:B'],
+    ['spotify:track:A', 'spotify:track:B', 'spotify:track:A'],
+    ['spotify:track:A']
+  ]) {
+    const context = contextWith({
+      QUEUE_LEDGER_LIMIT: 50, activeQueueRecoveryPlan: () => null,
+      readQueueLedger: () => ledger
+    });
+    loadFunctions(context, ['cleanQueueUris', 'queueAwarePlaybackBody']);
+    const input = { uris: ['spotify:track:A'] };
+    const body = context.queueAwarePlaybackBody(input, 'resume_last');
+    assert.deepEqual(Array.from(body.uris), ledger, 'resume adds the current item once while preserving every tail entry');
+    assert.deepEqual(input.uris, ['spotify:track:A'], 'the input body is not mutated');
+  }
+});
+
+test('cold context resume preserves ordered remaining items without duplicating its offset track', () => {
+  const ledger = ['spotify:track:A', 'spotify:track:B', 'spotify:track:A', 'spotify:track:C'];
+  const context = contextWith({
+    QUEUE_LEDGER_LIMIT: 50, activeQueueRecoveryPlan: () => null, readQueueLedger: () => ledger
+  });
+  loadFunctions(context, ['cleanQueueUris', 'queueAwarePlaybackBody']);
+  const body = context.queueAwarePlaybackBody({ context_uri: 'spotify:album:Album', offset: { uri: 'spotify:track:A' } }, 'resume_last');
+  assert.deepEqual(Array.from(body.uris), ledger);
+  assert.equal(body.context_uri, undefined);
+  assert.equal(body.offset, undefined);
+});
+
+test('cold resume preserves a later repeat when the durable head is a different track', () => {
+  const context = contextWith({
+    QUEUE_LEDGER_LIMIT: 50, activeQueueRecoveryPlan: () => null,
+    readQueueLedger: () => ['spotify:track:B', 'spotify:track:A', 'spotify:track:C']
+  });
+  loadFunctions(context, ['cleanQueueUris', 'queueAwarePlaybackBody']);
+  const body = context.queueAwarePlaybackBody({ uris: ['spotify:track:A'] }, 'resume_last');
+  assert.deepEqual(Array.from(body.uris), ['spotify:track:A', 'spotify:track:B', 'spotify:track:A', 'spotify:track:C']);
+});
+
+test('an authoritative in-memory recovery plan retains an intentional immediate repeat and position', () => {
+  const plan = { currentUri: 'spotify:track:A', uris: ['spotify:track:A', 'spotify:track:B'], positionMs: 42000 };
+  const context = contextWith({
+    QUEUE_LEDGER_LIMIT: 50, activeQueueRecoveryPlan: () => plan,
+    readQueueLedger: () => { throw new Error('a staged plan must not read the durable fallback'); }
+  });
+  loadFunctions(context, ['cleanQueueUris', 'queueAwarePlaybackBody']);
+  const body = context.queueAwarePlaybackBody({ uris: ['spotify:track:A'] }, 'resume_last');
+  assert.deepEqual(Array.from(body.uris), ['spotify:track:A', 'spotify:track:A', 'spotify:track:B']);
+  assert.equal(body.position_ms, 42000);
+  assert.deepEqual(plan.uris, ['spotify:track:A', 'spotify:track:B']);
+});
+
 test('a staged recovery plan never duplicates its current track', () => {
   const state = { currentTrackUri: 'spotify:track:B', localProgress: 12000, queueRecoveryPlan: null };
   let persisted = null;
