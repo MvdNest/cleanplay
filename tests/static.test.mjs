@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../app.css', import.meta.url), 'utf8');
 const serviceWorker = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 const manifest = JSON.parse(readFileSync(new URL('../manifest.webmanifest', import.meta.url), 'utf8'));
 
@@ -49,8 +50,7 @@ test('PWA remains standalone and the service worker ignores Spotify traffic', ()
 });
 
 test('the document owns page scrolling without a body scroll-chain trap', () => {
-  const css = html.match(/<style>([\s\S]*?)<\/style>/)[1];
-  assert.match(css, /html\{overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:none\}/);
+  assert.match(css, /html\{overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:none;/);
   for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (rule[1].split(',').some(selector => selector.trim() === 'body')) {
       assert.doesNotMatch(rule[2], /(?:overflow|overscroll-behavior)(?:-[xy])?\s*:/);
@@ -59,4 +59,11 @@ test('the document owns page scrolling without a body scroll-chain trap', () => 
   assert.match(css, /\.ctrl,\.tab,\.device-bar button,\.detail-back,\.up-next-link\{touch-action:manipulation\}/);
   assert.match(css, /env\(safe-area-inset-bottom,0px\)/);
   assert.doesNotMatch(html, /addEventListener\(['"](?:wheel|mousewheel|touchmove)['"]/);
+});
+
+test('redesign assets are included in the offline shell', () => {
+  for (const asset of ['app.css', 'library-backup.js']) {
+    assert.ok(html.includes('./' + asset));
+    assert.ok(serviceWorker.includes("new URL('" + asset + "', SCOPE_URL)"));
+  }
 });

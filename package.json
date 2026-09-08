@@ -1,10 +1,10 @@
 {
   "name": "cleanplay",
-  "version": "3.8.2",
+  "version": "4.0.0",
   "private": true,
   "description": "Deterministic checks for the CleanPlay static PWA",
   "scripts": {
-    "test": "node --test --test-isolation=none tests/static.test.mjs tests/player-runtime.test.mjs tests/diagnostics-analyzer.test.mjs",
+    "test": "node --test --test-isolation=none tests/static.test.mjs tests/player-runtime.test.mjs tests/diagnostics-analyzer.test.mjs tests/ui-runtime.test.mjs tests/library-backup.test.mjs",
     "analyze:diagnostics": "node tools/analyze-diagnostics.mjs"
   },
   "engines": {

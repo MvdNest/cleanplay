@@ -4,7 +4,7 @@
 // before the previous one is removed, so an update never destroys the last
 // known-good offline shell.
 const CACHE_PREFIX = 'cleanplay-shell-';
-const CACHE_VERSION = '2026-09-07-3';
+const CACHE_VERSION = '2026-09-08-1';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
 // registration.scope makes every URL work both at a custom domain and under
@@ -15,6 +15,8 @@ const APP_SHELL = [
   new URL('./', SCOPE_URL).href,
   INDEX_URL,
   new URL('manifest.webmanifest', SCOPE_URL).href,
+  new URL('app.css', SCOPE_URL).href,
+  new URL('library-backup.js', SCOPE_URL).href,
   new URL('icons/icon.svg', SCOPE_URL).href,
   new URL('icons/icon-180.png', SCOPE_URL).href,
   new URL('icons/icon-192.png', SCOPE_URL).href,

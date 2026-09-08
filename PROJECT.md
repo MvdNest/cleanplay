@@ -2,7 +2,7 @@
 
 > Personal, text-only Spotify control. The app never renders album art or artist imagery.
 
-This document describes the v3.8.2 architecture and the constraints future changes must preserve.
+This document describes the v4.0 architecture and the constraints future changes must preserve.
 
 ## Deployment
 
@@ -19,12 +19,16 @@ Allow roughly 60-120 seconds after a push for Pages to rebuild. A service worker
 
 CleanPlay provides a calm Spotify interface with text metadata and no artwork. It has two playback patterns:
 
-1. **Play here:** use Spotify's Web Playback SDK to make CleanPlay itself the playback device. This is the primary path for an iPhone without the Spotify app. Let an active SDK queue continue while iOS keeps it alive, preserve the remaining queue locally, and require a fresh user-activated registration and explicit transfer before routing a new selection after suspension.
+1. **Play here:** use Spotify's Web Playback SDK to make CleanPlay itself the playback device. On iPhone without the Spotify app, ordinary Safari is the currently user-verified route for locked-screen track transitions. Let an active SDK queue continue while iOS keeps it alive, preserve the remaining queue locally, and reuse a healthy player after suspension. Require a fresh user-activated registration only when actual playback/device evidence warrants a replacement.
 2. **Remote:** optionally control a speaker, computer, car, or another Spotify Connect device.
 
 If exactly one unrestricted Connect device is available, it may be selected even while inactive. If no Connect device exists, an intentional Play tap may prepare the local SDK target. Never send a playback-start request with neither an explicit target nor a currently active Spotify session.
 
 Spotify SDK device IDs are ephemeral session identifiers, not durable preferences. The app must recover clearly instead of routing controls to a remembered device that no longer exists.
+
+### First-principles decisions
+
+The actual requirements are one-tap access, dependable playback, a useful saved list, and no album art. Standalone mode, automatic rebuilding, extra background work, and a native rewrite are implementation choices, not goals. v4.0 questions those choices first: retain Safari's demonstrated working path, delete time-based/hidden-only player retirement, defer optional Spotify library requests, separate presentation from playback, and keep one owner of natural track advancement. Simplify before adding automation; verify recovery behavior rather than promising it from a new UI.
 
 ## Artwork boundary
 
@@ -38,7 +42,9 @@ When Spotify's native app or embedded SDK owns audio, iOS controls the lock-scre
 ## Files and runtime
 
 ```text
-index.html             App markup, CSS, and JavaScript
+index.html             App markup and client-side playback/UI JavaScript
+app.css                Responsive presentation and interaction styles
+library-backup.js      Pure, bounded text-only Listen Later portability helpers
 manifest.webmanifest   PWA identity, display mode, theme, and icons
 sw.js                  Versioned app-shell service worker
 icons/                 CleanPlay SVG and PNG install icons
@@ -52,9 +58,19 @@ There is no build step, application backend, or remote CleanPlay database. The b
 
 The manifest supplies a scoped start URL, standalone display, dark theme colors, and SVG/180/192/512 pixel icons. The page links the manifest and iOS touch icon, supports safe-area insets, and registers `sw.js`.
 
+On September 7, 2026 the user confirmed that the same locked-screen listening flow advanced automatically in Safari, while the installed home-screen app waited until unlock. Logs showed the standalone surface without corresponding `401`/`404` failures. This narrows the observed problem to the standalone/background path; it does not prove a specific WebKit defect or universal Safari reliability.
+
+Recommend Safari for longer listening. On iOS 26, **Share > Add to Home Screen > Open as Web App off** creates a browser bookmark; with Safari as default, this retains a home-screen icon while opening the working browser path. A manifest change alone cannot override this user-controlled choice. Show targeted standalone guidance and copy only the canonical, query-free app URL. Do not claim that an ordinary same-origin link necessarily escapes standalone into Safari. Keep the old installation until its saved list has been exported; browser storage and sign-in can differ.
+
+References:
+
+- [WebKit iOS 26 home-screen behavior](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/#every-site-can-be-a-web-app-on-ios-and-ipados)
+- [WebKit bug 261858](https://bugs.webkit.org/show_bug.cgi?id=261858) describes a closely matching standalone-versus-Safari transition failure on iOS 16-17; it is precedent, not proof of the user's current iOS cause.
+- [Spotify Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk) documents mobile support and iOS autoplay limitations, not a background lifetime guarantee.
+
 The service worker provides an offline **shell**, not offline Spotify:
 
-- Install precaches only the exact same-origin allowlist: root/index, manifest, and CleanPlay icons.
+- Install precaches only the exact same-origin shell allowlist: root/index, `app.css`, `library-backup.js`, manifest, and CleanPlay icons.
 - Navigations are network-first and fall back to canonical cached `index.html`.
 - Listed static shell assets are cache-first.
 - Cross-origin Spotify/SDK/LRCLIB traffic is never intercepted or cached.
@@ -96,13 +112,13 @@ Official references:
 
 The original iPhone failure was a PWA waking with an access token or SDK device ID that had stopped being valid during lock. Player calls then returned `401`, `404`, `NO_ACTIVE_DEVICE`, or "device not found."
 
-v3.8 recovery follows these rules:
+v4.0 recovery follows these rules:
 
 1. Serialize foreground/network recovery so several lifecycle signals cannot race. A foreground or manual retry supersedes work that was suspended while hidden, and every network/recovery attempt is bounded.
 2. Refresh authorization first when necessary; do not sign out for a transient failure.
-3. Preserve an already-playing SDK queue and player while hidden, but expire its Player API route lease on `hidden`/`pagehide`, persist a recovery plan, and stop hidden polling. Do not disconnect while hidden. On iOS only, after a meaningful suspension, keep the old generation until the next real playback gesture replaces and activates it. Desktop tabs retain their ready player and test its route; elapsed background time or missing discovery rows alone must not retire it.
+3. Preserve an already-playing SDK queue and player while hidden, but expire its Player API route lease on `hidden`/`pagehide`, persist a recovery plan, and stop hidden polling. Do not disconnect while hidden. On all platforms, elapsed background time, a ready event delivered while hidden, or missing discovery rows alone must not retire the player. Actual `not_ready`, authoritative route failure, or stalled-audio evidence can require a fresh player gesture.
 4. Foreground recovery may verify identity, refresh state, and warm the SDK script, but it must not construct an unactivated replacement player. Only a direct user action can do that safely on iOS.
-5. On each deliberate local playback gesture, call `activateElement()` synchronously and await its Promise. Rebuild the player in that same gesture if the previous route is unconfirmed or an authoritative loss occurred.
+5. On a deliberate local start/resume or Play here gesture, call `activateElement()` synchronously and await its Promise. Rebuild the player in that same gesture if playback/device evidence has made its route unconfirmed or an authoritative loss occurred. Pause is not an activation gesture.
 6. Treat the current SDK generation's `ready` event as the source of its device ID. `/devices` is advisory and may lag or retain a retired iPhone registration; two misses are degraded, never synthetic success. After activation, explicitly transfer with `PUT /me/player` and `play:false`, allow one bounded registration window on the same fresh ID, and keep playback commands pinned to that exact ID.
 7. Maintain `cp_queue_ledger_v1`, an ordered local ledger of CleanPlay-queued URIs. Use one `/play` URI sequence to restore an explicitly resumed interrupted session or the current item and remaining sequence after an unavoidable replacement.
 8. A deliberate selection is a generation-scoped pending intent. The newest selection owns exactly one `/play` command and never inherits a stale recovery plan.
@@ -110,6 +126,8 @@ v3.8 recovery follows these rules:
 10. Treat a Player API success and `paused:false` as accepted/loading, not audible. Retain the latest pending selection until two samples for the expected item show monotonically advancing SDK position; a position-zero or wrong-item SDK must never be labelled Connected.
 11. Classify SDK playback errors into redacted categories. Pause on the first error so a failed media load cannot silently burn through the remaining queue.
 12. Restart ordinary polling after recovery settles. Polling is read-only: a null/204 state, null `player_state_changed` payload, or paused-at-zero transition is never permission to synthesize `/next` or `/play`.
+13. Pause and sleep-timer pause cancel pending start intent and send only the targeted stop. They must not activate audio, construct a new local player, or transfer playback. If the selected local player has no ID, fail safely without stopping an unrelated remote device.
+14. Once advancing SDK position proves that the same player continued, clear its old pre-lock recovery snapshot. A later resume must not rewind to the snapshot's previous song or replay its stale remaining queue.
 
 Keep recovery idempotent and visible in diagnostics. iOS still requires `player.activateElement()` during a real tap before in-browser audio starts; automated wake logic cannot manufacture that gesture.
 
@@ -118,7 +136,7 @@ Routing invariants:
 - SDK IDs belong to one player generation and are never persisted; `ready` alone does not prove Player API routability.
 - Track desired target, SDK readiness, audio activation, and successful transfer as separate states.
 - Prefer Spotify's currently reported Connect device for remote control.
-- Use the current CleanPlay SDK generation only after activation and explicit transfer succeed; `/devices` discovery is never an authoritative gate.
+- Local starts use the current activated SDK generation and bounded explicit transfer, with the documented exact-ID direct-play fallback after transfer-only `404`; `/devices` discovery is never an authoritative gate. Targeted pauses do not run that start handshake.
 - `204` playback state means idle, not necessarily failure.
 - Player `404` can mean a vanished device or no active session; it is not an auth failure.
 
@@ -136,7 +154,7 @@ The claim that Development Mode cannot save albums or tracks is stale. URI-based
 
 Appropriate modification scopes still apply. Read endpoints such as `GET /me/tracks` and `GET /me/albums` remain available.
 
-CleanPlay v3 **does not call the generic writes**. Listen Later is local under `cp_saved_v1`. `/me/library` is a possible future opt-in path for Spotify-library sync, with different privacy and scope implications.
+CleanPlay **does not call the generic writes**. Listen Later is local under `cp_saved_v1`. `/me/library` is a possible future opt-in path for Spotify-library sync, with different privacy and scope implications.
 
 ### Playlist and response changes
 
@@ -166,6 +184,19 @@ Listen Later is a versioned, text-only collection in `cp_saved_v1`:
 - Does not sync across devices or isolated browser storage and is lost when its site data is cleared.
 
 Parsing and migration must tolerate malformed or older entries without breaking startup.
+
+### Portable saved-list backups
+
+`library-backup.js` exposes a pure `CleanPlayBackup` API: `serialize(items)` returns JSON, `parse(text)` validates and returns clean items, and `merge(existing, incoming)` returns `{items, added, updated, unchanged, omitted}`. It has no DOM, storage, credentials, or network access. The UI explicitly downloads a file or imports a user-selected file; it writes the saved library only after validation succeeds.
+
+- Envelope: `format: "cleanplay-listen-later"`, `version: 1`, `exportedAt`, `items`.
+- Item allowlist: `type`, `uri`, `name`, `subtitle`, `meta`, `durationMs`, `savedAt`; no artwork, credential fields, or arbitrary imported properties.
+- Maximum file size is 1 MiB (UTF-8); maximum list size is 300 items. Name/subtitle/meta are bounded to 180/220/220 characters; type and Spotify URI must agree. An optional imported ID must match the URI and is not retained.
+- Malformed JSON, foreign formats, unsupported versions, invalid items, and oversized inputs are rejected before writes.
+- Merge deduplicates by URI, uses the newer saved timestamp, and preserves the destination entry on ties. Existing entries are not removed to make space; excess new entries are counted in `omitted` and surfaced to the user.
+- Exports contain music names and addresses, so they are user data even though they exclude authentication. They transfer neither sign-in nor diagnostics, playback queues, audio, or automatic cross-device sync.
+
+This is the supported way to carry Listen Later from the standalone app into Safari without moving account credentials or deleting the old installation first.
 
 ## Local diagnostics
 
@@ -209,7 +240,9 @@ The responsive UI uses bottom navigation on iPhone and a sidebar on wide screens
 - **Detail** - album, artist, or playlist playback and Listen Later actions
 - **Settings** - device, timer, account, reliability status, and diagnostics
 
-Keep 44px-class tap targets, safe-area insets, visible keyboard focus, and reduced-motion support. Avoid hover-only actions.
+v4.0 separates presentation into `app.css`, with a calmer text-led player layout, desktop sidebar, compact mobile navigation, and a mini-player on other views. Listen Later is immediately local; recently played, liked songs, and Spotify playlists load only when the user opens the optional Spotify-library section. Concurrent library loads share one request group.
+
+Keep 44px-class tap targets, safe-area insets, visible keyboard focus, and reduced-motion support. Avoid hover-only actions. Use real buttons for result and device actions, retain accessible action names and current-navigation state, and keep the seek slider keyboard-operable. Modal dialogs trap focus, isolate the background, close with Escape, and restore focus to the opener. Global shortcuts must not hijack inputs, buttons, links, sliders, composing text, or modal interaction. Search responses belong to their request sequence so an older result cannot overwrite a newer search.
 
 The document root owns vertical page scrolling. Keep horizontal clipping and overscroll suppression on `html`, not `body`: clipping on both elements makes the body an extra scroll container, and body overscroll suppression can trap wheel/touch scrolling before it reaches the document. Retain native scrolling inside lyrics, diagnostics, and modals; do not add wheel/touch interception.
 
@@ -221,6 +254,7 @@ The document root owns vertical page scrolling. Keep horizontal clipping and ove
 | `404`, `NO_ACTIVE_DEVICE`, or device not found | A fresh SDK ID is still propagating, or the old device vanished | CleanPlay retries the same local ID once; if it still fails, tap playback again to activate a replacement. For remote playback, choose a live device |
 | Sign-in required after about six months | Fixed refresh-token lifetime reached | Complete PKCE authorization again |
 | Play here is silent on iPhone | User gesture missing or SDK was genuinely retired | Tap a playback action once to activate the browser player |
+| Next song waits until iPhone unlock, but works in ordinary Safari | Observed standalone/background limitation, not necessarily auth/device loss | Use Safari; on iOS 26 add a browser shortcut with Open as Web App off. Export/import Listen Later before retiring the old icon |
 | Shell opens but controls fail offline | Only static shell is cached | Reconnect |
 | Old UI after deploy | Previous service-worker shell remains | Close/reopen or hard-refresh; verify cache version bump |
 | Intermittent failure vanished | Evidence was lost during recovery | Copy redacted diagnostics before clearing/signing out |
@@ -231,7 +265,8 @@ The document root owns vertical page scrolling. Keep horizontal clipping and ove
 2. Test through HTTP/HTTPS, not a `file:` URL.
 3. Inspect the diff, commit, and push `main`.
 4. Wait for a successful Pages build, then hard-refresh desktop.
-5. Test installed iPhone PWA: launch, auth callback, remote playback, Play here gesture, lock/unlock, offline shell, Listen Later persistence, diagnostics copy/clear, and update pickup.
+5. Test desktop and narrow layouts: native wheel/touch scrolling, keyboard navigation and dialogs, overlapping searches, mini-player controls, deferred library loading, Listen Later export/import, and shell update pickup.
+6. Test actual iPhone Safari and installed standalone separately: launch, auth callback, Play here gesture, multiple locked-screen track transitions, pause after unlock, remote playback, offline shell, Listen Later persistence, and diagnostics copy/clear. Desktop mobile emulation does not verify iOS background audio.
 
 Do not commit personal contact details, Client Secrets, tokens, or copied diagnostics to this public repository.
 
@@ -245,7 +280,7 @@ Do not commit personal contact details, Client Secrets, tokens, or copied diagno
 - Listen Later is local-only and can be lost with site data.
 - Spotify/iOS may show artwork in system-owned media UI.
 
-An iOS wrapper around this web player would inherit the same suspension limits, while Spotify's native iOS App Remote SDK depends on the Spotify app being installed. Under the no-Spotify-app requirement, the PWA remains the viable local playback route but cannot promise native-grade background lifetime. A minimal backend could add cross-device Listen Later, HttpOnly refresh-token custody, or centralized opt-in diagnostics, but it cannot stop iOS suspending browser audio. Do not add competing audio elements or rapid rebuild loops.
+A generic iOS wrapper around this web player has no demonstrated guarantee against its background problem, while [Spotify's native iOS App Remote SDK](https://developer.spotify.com/documentation/ios/getting-started) requires the Spotify app being installed. Under the no-Spotify-app requirement, ordinary Safari is the currently user-verified local playback direction, with standalone remaining optional and unproven for continuous lock-screen use. A minimal backend could add automatic cross-device Listen Later, HttpOnly refresh-token custody, or centralized opt-in diagnostics, but it cannot stop iOS suspending browser audio. Do not add competing audio elements or rapid rebuild loops. The AudioSession API controls audio focus/category; it is not a background keepalive guarantee for Spotify's embedded player.
 
 ## History
 
@@ -265,3 +300,4 @@ An iOS wrapper around this web player would inherit the same suspension limits, 
 14. **v3.8.0** - treats long-suspended SDK registrations as unconfirmed, keeps local commands pinned to an explicit device, waits through bounded fresh-device registration, requires real SDK position progress before declaring audio audible, preserves recovery queues across longer locks, and records standalone/progress evidence in diagnostics.
 15. **v3.8.1** - confines time-based player replacement to iOS, preserves desktop players after backgrounding, and shares exhausted registration results across Here/Retry/new-song clicks to prevent duplicate transfer loops. Retry can directly play the remembered selection after a transfer-only 404.
 16. **v3.8.2** - restores native wheel scrolling in Edge by removing the body scroll-chain trap. Keeps iPhone safe-area spacing, touch controls, bottom navigation, and all playback JavaScript unchanged.
+17. **v4.0** - separates and substantially revises the responsive UI, adds a cross-view mini-player and safe Listen Later file portability, defers optional Spotify-library requests, improves keyboard/modal/search behavior, documents the user-confirmed Safari shortcut direction, removes time-based/hidden-only SDK retirement, keeps pause free of activation/transfer, and discards stale recovery snapshots once real continued playback is confirmed. Physical iPhone background behavior remains a separate verification requirement.

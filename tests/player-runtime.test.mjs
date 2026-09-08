@@ -103,7 +103,7 @@ test('going offline expires the local route lease and cancels stale recovery wor
   assert.equal(health[0], 'offline');
 });
 
-test('a meaningful suspension keeps the player until a tap but marks its route unconfirmed', () => {
+test('a long iPhone suspension never retires a player based on elapsed time alone', () => {
   const player = {};
   const state = {
     preferredTarget: { kind: 'here' }, webPlayer: player, cleanplayDeviceId: 'ephemeral',
@@ -114,18 +114,17 @@ test('a meaningful suspension keeps the player until a tap but marks its route u
   const context = contextWith({
     state,
     Date: { now: () => 121000 },
-    usesIosPlaybackLifecycle: () => true,
-    LOCAL_PLAYER_STALE_AFTER_SUSPEND_MS: 60000
+    usesIosPlaybackLifecycle: () => true
   });
   loadFunctions(context, ['consumeLocalSuspend']);
   assert.equal(context.consumeLocalSuspend(), 120000);
   assert.equal(state.webPlayer, player);
   assert.equal(state.cleanplayDeviceId, 'ephemeral');
-  assert.equal(state.sdkDeviceUnconfirmed, true);
-  assert.equal(state.sdkPlaybackActive, false);
-  assert.equal(state.needsPlaybackResume, true);
-  assert.equal(state.sdkTransferGeneration, 0);
-  assert.equal(state.sdkRouteLeaseEpoch, -1);
+  assert.equal(state.sdkDeviceUnconfirmed, false);
+  assert.equal(state.sdkPlaybackActive, true);
+  assert.equal(state.needsPlaybackResume, false);
+  assert.equal(state.sdkTransferGeneration, 2);
+  assert.equal(state.sdkRouteLeaseEpoch, 5);
 });
 
 test('a desktop return after 36 minutes and two missing discovery rows preserves the SDK player', async () => {
@@ -159,7 +158,7 @@ test('a desktop return after 36 minutes and two missing discovery rows preserves
   assert.equal(state.needsSdkRecovery, false);
 });
 
-test('iPad desktop user agent still uses iOS suspension recovery', () => {
+test('iPad desktop user agent is still identified as an iOS browser', () => {
   const context = contextWith({ navigator: { userAgent: 'Macintosh', platform: 'MacIntel', maxTouchPoints: 5 } });
   loadFunctions(context, ['usesIosPlaybackLifecycle']);
   assert.equal(context.usesIosPlaybackLifecycle(), true);
@@ -318,6 +317,54 @@ test('never-settling SDK state and pause calls are bounded during recovery', asy
   assert.equal(marked, 'position_stalled');
 });
 
+test('a superseded final SDK sample cannot pause or invalidate a newer selection', async () => {
+  let current = true;
+  let samples = 0;
+  let pauses = 0;
+  let recoveries = 0;
+  const player = {
+    getCurrentState: async () => {
+      samples += 1;
+      if (samples === 6) current = false;
+      return { paused: false, position: 0, track_window: { current_track: { uri: 'spotify:track:A' } } };
+    },
+    pause: async () => { pauses += 1; }
+  };
+  const state = { webPlayer: player, sdkGeneration: 2 };
+  const context = contextWith({
+    state,
+    sdkRouteDelay: async () => {},
+    markSdkGenerationForRecovery: () => { recoveries += 1; },
+    noteDiagnostic: () => {}, setConnectionHealth: () => {}
+  });
+  loadFunctions(context, ['sdkCallWithin', 'ensureSdkPlaybackAudible']);
+  assert.equal(await context.ensureSdkPlaybackAudible(2, () => current, 'spotify:track:A'), false);
+  assert.equal(samples, 6);
+  assert.equal(pauses, 0);
+  assert.equal(recoveries, 0);
+});
+
+test('a superseded advancing SDK result cannot clear the new selection recovery plan', async () => {
+  let current = true;
+  let samples = 0;
+  const recovery = { currentUri: 'spotify:track:NEW', uris: ['spotify:track:NEXT'] };
+  const player = {
+    getCurrentState: async () => {
+      samples += 1;
+      if (samples === 2) current = false;
+      return { paused: false, position: samples * 300, track_window: { current_track: { uri: 'spotify:track:OLD' } } };
+    }
+  };
+  const state = { webPlayer: player, sdkGeneration: 2, queueRecoveryPlan: recovery };
+  const context = contextWith({
+    state, sdkRouteDelay: async () => {},
+    consumeQueueLedger: () => { throw new Error('stale sample must not consume the queue'); }
+  });
+  loadFunctions(context, ['sdkCallWithin', 'ensureSdkPlaybackAudible']);
+  assert.equal(await context.ensureSdkPlaybackAudible(2, () => current, 'spotify:track:OLD'), false);
+  assert.equal(state.queueRecoveryPlan, recovery);
+});
+
 test('Web API is_playing cannot consume a local queue before SDK progress proof', async () => {
   let consumed = 0;
   const state = {
@@ -408,6 +455,102 @@ test('the first play tap after an unconfirmed local wake resumes instead of paus
   });
   loadFunctions(context, ['togglePlay']);
   assert.equal(await context.togglePlay(), true);
+  assert.equal(command, 'play');
+});
+
+test('an explicit local pause stays serialized but never activates, rebuilds, or transfers', async () => {
+  const requests = [];
+  const state = {
+    preferredTarget: { kind: 'here' }, isPlaying: true, sdkPlaybackActive: true,
+    needsSdkRecovery: true, sdkDeviceUnconfirmed: true, needsPlaybackResume: true,
+    currentTrackUri: 'spotify:track:A', activeDeviceId: 'old-local', cleanplayDeviceId: 'current-local',
+    sdkGeneration: 3, playerCommandSequence: 0, sdkProgressCheckSequence: 2,
+    playbackCommandEpoch: 4, pendingPlaybackIntent: { label: 'play_track' }, accessToken: 'present'
+  };
+  const context = contextWith({
+    state, navigator: {}, activeQueueRecoveryPlan: () => null,
+    preparePlaybackIntent: () => { throw new Error('pause must not prepare audio'); },
+    ensureLocalPlaybackRoute: () => { throw new Error('pause must not transfer audio'); },
+    api: async (path, method) => { requests.push([path, method]); return {}; },
+    noteDiagnostic: () => {}, setConnectionHealth: () => {}, updateControls: () => {}
+  });
+  loadFunctions(context, [
+    'togglePlay', 'playerCommand', 'executePlayerCommand', 'isStartPlaybackCommand',
+    'commandSupersedesPlayback', 'withPlaybackTarget', 'playbackTargetKind'
+  ]);
+  assert.equal(await context.togglePlay(false), true);
+  assert.deepEqual(requests, [['/me/player/pause?device_id=current-local', 'PUT']]);
+  assert.equal(state.pendingPlaybackIntent, null);
+  assert.equal(state.playerCommandSequence, 1);
+  assert.equal(state.playbackCommandEpoch, 5);
+  assert.equal(state.sdkProgressCheckSequence, 3);
+  assert.equal(state.isPlaying, false);
+});
+
+test('the displayed Pause control pauses during a natural track transition', async () => {
+  let command = null;
+  const state = {
+    preferredTarget: { kind: 'here' }, isPlaying: true, sdkPlaybackActive: false,
+    needsSdkRecovery: false, sdkDeviceUnconfirmed: false, needsPlaybackResume: false,
+    currentTrackUri: 'spotify:track:B', activeDeviceId: 'local', cleanplayDeviceId: 'local'
+  };
+  const context = contextWith({
+    state, navigator: {}, activeQueueRecoveryPlan: () => null,
+    preparePlaybackIntent: () => { throw new Error('the displayed Pause must not prepare a new start'); },
+    playerCommand: async label => { command = label; return true; }, updateControls: () => {}
+  });
+  loadFunctions(context, ['togglePlay']);
+  assert.equal(await context.togglePlay(), true);
+  assert.equal(command, 'pause');
+  assert.equal(state.isPlaying, false);
+});
+
+test('pause with no current local device leaves a different Spotify device untouched', async () => {
+  const state = {
+    preferredTarget: { kind: 'here' }, cleanplayDeviceId: null,
+    activeDeviceId: 'unrelated-remote', playerCommandSequence: 1
+  };
+  const context = contextWith({
+    state, noteDiagnostic: () => {}, setConnectionHealth: () => {},
+    reconcileDevices: () => { throw new Error('pause must not pick a different device'); },
+    api: () => { throw new Error('pause must not target a different device'); }
+  });
+  loadFunctions(context, ['executePlayerCommand']);
+  assert.equal(await context.executePlayerCommand('pause', () => ({}), 1), false);
+});
+
+test('a sleep pause supersedes a pending play and clears its deferred intent', async () => {
+  const commands = [];
+  const state = {
+    playerCommandSequence: 0, playbackCommandEpoch: 5,
+    pendingPlaybackIntent: { label: 'play_track' }, sdkProgressCheckSequence: 0
+  };
+  const context = contextWith({ state, executePlayerCommand: async command => { commands.push(command); return true; } });
+  loadFunctions(context, ['playerCommand', 'commandSupersedesPlayback', 'isStartPlaybackCommand']);
+  const play = context.playerCommand('play_track', () => ({}));
+  const pause = context.playerCommand('sleep_pause', () => ({}));
+  assert.deepEqual(await Promise.all([play, pause]), [false, true]);
+  assert.deepEqual(commands, ['sleep_pause']);
+  assert.equal(state.pendingPlaybackIntent, null);
+  assert.equal(state.playbackCommandEpoch, 6);
+});
+
+test('resuming a healthy paused player ignores its obsolete pre-lock queue snapshot', async () => {
+  let command = null;
+  const state = {
+    preferredTarget: { kind: 'here' }, isPlaying: false, sdkPlaybackActive: false,
+    needsSdkRecovery: false, sdkDeviceUnconfirmed: false, needsPlaybackResume: false,
+    currentTrackUri: 'spotify:track:B', activeDeviceId: 'local', cleanplayDeviceId: 'local'
+  };
+  const context = contextWith({
+    state, navigator: {}, activeQueueRecoveryPlan: () => ({ currentUri: 'spotify:track:A', uris: ['spotify:track:B'] }),
+    preparePlaybackIntent: () => false,
+    playBody: () => { throw new Error('healthy resume must not restart the pre-lock track'); },
+    playerCommand: async label => { command = label; return true; },
+    startPolling: () => {}, updateControls: () => {}
+  });
+  loadFunctions(context, ['togglePlay']);
+  assert.equal(await context.togglePlay(true), true);
   assert.equal(command, 'play');
 });
 
@@ -549,6 +692,37 @@ test('an initialization error immediately marks a fresh generation replaceable',
   await Promise.resolve();
 });
 
+test('an SDK ready event while iPhone is hidden preserves its fresh registration', async () => {
+  const listeners = {};
+  const player = {
+    addListener: (event, handler) => { listeners[event] = handler; },
+    connect: async () => true
+  };
+  const Player = function Player() { return player; };
+  const state = {
+    accessToken: 'present', sdkGeneration: 3, preferredTarget: { kind: 'here' },
+    sdkDeviceUnconfirmed: true, sdkActivated: false
+  };
+  const context = contextWith({
+    state, Spotify: { Player }, window: { Spotify: { Player } },
+    usesIosPlaybackLifecycle: () => true, isAppVisible: () => false,
+    makeSdkReadyPromise: () => {}, resolveSdkReady: () => {},
+    runPendingPlaybackIntent: async () => false,
+    noteDiagnostic: () => {}, setConnectionHealth: () => {}
+  });
+  loadFunctions(context, ['createWebPlayer']);
+  context.createWebPlayer();
+  listeners.ready({ device_id: 'fresh-hidden-player' });
+  assert.equal(state.webPlayer, player);
+  assert.equal(state.sdkGeneration, 4);
+  assert.equal(state.cleanplayDeviceId, 'fresh-hidden-player');
+  assert.equal(state.sdkReady, true);
+  assert.equal(state.sdkDeviceUnconfirmed, false);
+  assert.equal(state.needsSdkRecovery, false);
+  assert.equal(state.sdkTransferGeneration, 0);
+  await Promise.resolve();
+});
+
 test('a never-settling audio activation is bounded and marks the generation replaceable', async () => {
   let timerId = 0;
   const never = new Promise(() => {});
@@ -603,6 +777,33 @@ test('a new start command cancels delayed progress proof from the old track', as
   assert.equal(state.sdkProgressCheckSequence, 1);
   await timer();
   assert.equal(consumed, 0);
+});
+
+test('confirmed natural SDK advancement retires the pre-lock recovery snapshot', async () => {
+  let timer = null;
+  let consumed = null;
+  const player = {
+    getCurrentState: async () => ({
+      paused: false, position: 2400,
+      track_window: { current_track: { uri: 'spotify:track:B' } }
+    })
+  };
+  const state = {
+    webPlayer: player, sdkGeneration: 4, sdkProgressCheckSequence: 0,
+    queueRecoveryPlan: { currentUri: 'spotify:track:A', uris: ['spotify:track:B', 'spotify:track:C'] }
+  };
+  const context = contextWith({
+    state, setTimeout: callback => { timer = callback; return 1; },
+    sdkCallWithin: callback => callback(),
+    consumeQueueLedger: uri => { consumed = uri; }, startPolling: () => {}
+  });
+  loadFunctions(context, ['scheduleSdkProgressConfirmation']);
+  context.scheduleSdkProgressConfirmation(player, 4, 'spotify:track:B', 1200);
+  await timer();
+  assert.equal(consumed, 'spotify:track:B');
+  assert.equal(state.queueRecoveryPlan, null);
+  assert.equal(state.sdkPlaybackActive, true);
+  assert.equal(state.needsPlaybackResume, false);
 });
 
 test('rapid queued commands coalesce to the newest command before execution', async () => {
